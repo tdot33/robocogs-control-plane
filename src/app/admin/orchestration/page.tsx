@@ -1,5 +1,10 @@
 import { db } from '@/lib/db'
 import { AgentTasksTable } from '@/components/agent-tasks-table'
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { ADMIN_SESSION_COOKIE, isAdminSessionValid } from '@/lib/admin-auth'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata = {
   title: 'Orchestration Dashboard',
@@ -7,6 +12,13 @@ export const metadata = {
 }
 
 export default async function OrchestrationPage() {
+  const cookieStore = await cookies()
+  const sessionCookie = cookieStore.get(ADMIN_SESSION_COOKIE)?.value
+
+  if (!isAdminSessionValid(sessionCookie)) {
+    redirect('/admin/login?next=/admin/orchestration')
+  }
+
   const tasks = await db.execute('SELECT * FROM agent_tasks ORDER BY created_at DESC LIMIT 50')
   const tasksData = (tasks.rows || []) as any[]
 
@@ -14,11 +26,21 @@ export default async function OrchestrationPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 px-4 py-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div>
           <h1 className="text-4xl font-bold text-slate-900 mb-2">Orchestration Control Surface</h1>
           <p className="text-lg text-slate-600">
             Agent task execution, gate approvals, and audit evidence
           </p>
+          </div>
+          <form method="POST" action="/api/admin/logout">
+            <button
+              type="submit"
+              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Sign Out
+            </button>
+          </form>
         </div>
 
         {/* Stats */}

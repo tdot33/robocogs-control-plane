@@ -1,4 +1,5 @@
 # RoboCOGS Control Plane
+# RoboCOGS Control Plane
 
 Orchestration infrastructure for the RoboCOGS agent team, gate approval system, and task lifecycle management.
 
@@ -24,7 +25,7 @@ GitHub Events (webhooks)
   Turso SQLite Database
          ↓
   Control Surface UI (/admin/orchestration)
-```
+GitHub Events (webhooks)
 
 ## Prerequisites
 
@@ -35,6 +36,7 @@ GitHub Events (webhooks)
 
 ## Setup
 
+```
 ### 1. Database
 
 Create a Turso database:
@@ -64,6 +66,11 @@ INNGEST_SIGNING_KEY=signkey_prod_...
 
 # Next.js
 NEXT_PUBLIC_API_URL=http://localhost:3001
+
+# Dashboard auth gate
+ADMIN_UI_USERNAME=admin
+ADMIN_UI_PASSWORD=change-me
+ADMIN_UI_SESSION_SECRET=replace-with-long-random-secret
 ```
 
 ### 3. Database Migrations
@@ -151,6 +158,7 @@ Gate approval history:
 ## Control Surface Dashboard
 
 **Route:** `/admin/orchestration`
+**Login:** `/admin/login`
 
 Features:
 - Real-time task list showing all active orchestration tasks
@@ -163,8 +171,9 @@ Features:
 
 All GitHub webhooks are validated using:
 - **HMAC-SHA256** signatures (`X-Hub-Signature-256` header)
-- **Replay protection** with 5-minute timestamp window
 - **Timing-safe comparison** to prevent timing attacks
+
+In bridge mode, validated payloads are forwarded with optional Cloud Run OIDC service-to-service authentication (`WEBHOOK_FORWARD_AUTH_MODE=oidc`).
 
 ## Cross-Repo Integration
 
@@ -200,3 +209,48 @@ gcloud run deploy robocogs-control-plane \
 ## License
 
 Same as main robocogs repository
+
+### Ingress Bridge Model (recommended with strict org policy)
+
+Deploy two Cloud Run services:
+
+1. Private backend service (no unauthenticated access):
+
+```bash
+gcloud run deploy robocogs-control-plane \
+       --source . \
+       --region northamerica-northeast2 \
+       --platform managed \
+       --no-allow-unauthenticated \
+       --service-account "robocogs-control-plane-sa@<project>.iam.gserviceaccount.com" \
+       --set-env-vars "NODE_ENV=production" \
+       --set-secrets "TURSO_URL=TURSO_URL:latest,TURSO_AUTH_TOKEN=TURSO_AUTH_TOKEN:latest,GITHUB_APP_ID=GITHUB_APP_ID:latest,GITHUB_APP_PRIVATE_KEY=GITHUB_APP_PRIVATE_KEY:latest,GITHUB_WEBHOOK_SECRET=GITHUB_WEBHOOK_SECRET:latest"
+```
+
+2. Public bridge service in a project where public ingress is allowed:
+
+```bash
+gcloud run deploy robocogs-webhook-bridge \
+       --source . \
+       --region northamerica-northeast2 \
+       --platform managed \
+       --allow-unauthenticated \
+       --service-account "robocogs-webhook-bridge-sa@<public-project>.iam.gserviceaccount.com" \
+       --set-env-vars "NODE_ENV=production,WEBHOOK_FORWARD_URL=https://<private-service-url>/api/webhooks/github,WEBHOOK_FORWARD_AUTH_MODE=oidc,WEBHOOK_FORWARD_AUDIENCE=https://<private-service-url>" \
+       --set-secrets "GITHUB_WEBHOOK_SECRET=GITHUB_WEBHOOK_SECRET:latest"
+```
+
+3. Grant bridge service account invoke permission on private backend:
+
+```bash
+gcloud run services add-iam-policy-binding robocogs-control-plane \
+       --region northamerica-northeast2 \
+       --member="serviceAccount:robocogs-webhook-bridge-sa@<public-project>.iam.gserviceaccount.com" \
+       --role="roles/run.invoker"
+```
+
+4. Set GitHub App Webhook URL to bridge endpoint:
+
+```
+https://<bridge-service-url>/api/webhooks/github
+```
