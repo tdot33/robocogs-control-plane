@@ -1,8 +1,6 @@
 import { inngest, OrchestrationEvents } from './client'
 import { updateTaskStatus, appendLog, getTaskById } from '@/lib/db'
 import { createIssueComment } from '@/lib/github'
-import { readFileSync } from 'fs'
-import path from 'path'
 
 // Load gate question packs from robocogs repo (these would be synced)
 const GATE_QUESTION_PACKS: Record<string, { questions: Array<{ id: string; label: string; type: 'yes-no' | 'single-choice' | 'multi-choice' }> }> = {
