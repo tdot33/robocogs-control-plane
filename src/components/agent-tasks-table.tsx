@@ -11,6 +11,7 @@ export interface TaskData {
   progress: number
   branch: string | null
   issue_number: number | null
+  gate_current: string | null
   created_at: string
   updated_at: string
 }

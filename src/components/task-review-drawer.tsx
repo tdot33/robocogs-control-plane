@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { db } from '@/lib/db'
+import { useRouter } from 'next/navigation'
 import type { TaskData } from './agent-tasks-table'
 
 interface TaskReviewDrawerProps {
@@ -20,8 +20,12 @@ interface AgentLog {
 }
 
 export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProps) {
+  const router = useRouter()
   const [logs, setLogs] = useState<AgentLog[]>([])
   const [isApproved, setIsApproved] = useState(false)
+  const [note, setNote] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -30,11 +34,18 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
     const fetchLogs = async () => {
       try {
         setLoading(true)
-        // In real implementation, this would fetch from API
-        // const response = await fetch(`/api/tasks/${task.id}/logs`)
-        // const data = await response.json()
-        // setLogs(data)
-        setLogs([]) // Placeholder
+        setErrorMessage('')
+        const response = await fetch(`/api/admin/tasks/${task.id}/logs`, {
+          cache: 'no-store',
+        })
+        if (!response.ok) {
+          throw new Error(`Failed to fetch logs (${response.status})`)
+        }
+        const data = await response.json()
+        setLogs(Array.isArray(data.logs) ? data.logs : [])
+      } catch (error) {
+        setLogs([])
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to load logs')
       } finally {
         setLoading(false)
       }
@@ -42,6 +53,35 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
 
     fetchLogs()
   }, [isOpen, task.id])
+
+  const submitDecision = async (decision: 'approve' | 'reject') => {
+    try {
+      setIsSubmitting(true)
+      setErrorMessage('')
+      const response = await fetch(`/api/admin/tasks/${task.id}/decision`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          decision,
+          note,
+        }),
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        throw new Error(payload.error || `Failed to ${decision} task`)
+      }
+
+      router.refresh()
+      onClose()
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to submit decision')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   const logLevelColors: Record<string, string> = {
     info: 'text-slate-600 bg-slate-50',
@@ -123,6 +163,11 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
             {/* Logs */}
             <div className="p-6">
               <h3 className="font-semibold text-slate-900 mb-3">Activity Logs</h3>
+              {errorMessage ? (
+                <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  {errorMessage}
+                </div>
+              ) : null}
               <div className="space-y-2 max-h-48 overflow-y-auto">
                 {loading ? (
                   <p className="text-sm text-slate-600">Loading logs...</p>
@@ -142,6 +187,14 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
 
           {/* Footer */}
           <div className="border-t border-slate-200 p-6 bg-slate-50">
+            <label className="block text-xs font-semibold text-slate-600 uppercase mb-2">Decision Note (optional)</label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              className="mb-4 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500"
+              rows={3}
+              placeholder="Add context for this approval or rejection"
+            />
             <label className="flex items-center gap-3 cursor-pointer mb-4">
               <input
                 type="checkbox"
@@ -154,24 +207,32 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
             <div className="flex gap-2">
               <button
                 onClick={() => {
-                  if (isApproved) {
-                    // Submit approval
-                    console.log('Approved:', task.id)
-                  }
-                  onClose()
+                  if (!isApproved || isSubmitting) return
+                  void submitDecision('approve')
                 }}
                 className={`flex-1 px-4 py-2 rounded font-medium text-sm transition-colors ${
-                  isApproved
+                  isApproved && !isSubmitting
                     ? 'bg-green-600 hover:bg-green-700 text-white'
                     : 'bg-slate-200 text-slate-700 cursor-not-allowed'
                 }`}
-                disabled={!isApproved}
+                disabled={!isApproved || isSubmitting}
               >
-                Approve
+                {isSubmitting ? 'Submitting...' : 'Approve'}
+              </button>
+              <button
+                onClick={() => {
+                  if (isSubmitting) return
+                  void submitDecision('reject')
+                }}
+                className="flex-1 px-4 py-2 rounded font-medium text-sm bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50"
+                disabled={isSubmitting}
+              >
+                Reject
               </button>
               <button
                 onClick={onClose}
-                className="flex-1 px-4 py-2 rounded font-medium text-sm bg-slate-200 hover:bg-slate-300 text-slate-900 transition-colors"
+                className="flex-1 px-4 py-2 rounded font-medium text-sm bg-slate-200 hover:bg-slate-300 text-slate-900 transition-colors disabled:opacity-50"
+                disabled={isSubmitting}
               >
                 Close
               </button>
