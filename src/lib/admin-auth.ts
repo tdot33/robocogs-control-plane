@@ -29,14 +29,19 @@ function sign(value: string): string | null {
 }
 
 export function validateAdminCredentials(username: string, password: string): boolean {
-  const expectedUsername = process.env.ADMIN_UI_USERNAME
-  const expectedPassword = process.env.ADMIN_UI_PASSWORD
+  const expectedUsername = process.env.ADMIN_UI_USERNAME?.trim()
+  const expectedPassword = process.env.ADMIN_UI_PASSWORD?.trim()
+  const normalizedUsername = username.trim()
+  const normalizedPassword = password.trim()
 
   if (!expectedUsername || !expectedPassword) {
     return false
   }
 
-  return timingSafeEqualText(username, expectedUsername) && timingSafeEqualText(password, expectedPassword)
+  return (
+    timingSafeEqualText(normalizedUsername, expectedUsername) &&
+    timingSafeEqualText(normalizedPassword, expectedPassword)
+  )
 }
 
 export function createAdminSessionCookie(username: string): { value: string; maxAge: number } | null {
