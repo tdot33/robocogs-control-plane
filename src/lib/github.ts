@@ -1,20 +1,30 @@
 import { App } from '@octokit/app'
 import Octokit from '@octokit/rest'
 
-const appId = process.env.GITHUB_APP_ID
-const privateKey = process.env.GITHUB_APP_PRIVATE_KEY
+let githubApp: App | null = null
 
-if (!appId || !privateKey) {
-  throw new Error('GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY environment variables are required')
+function getGitHubApp() {
+  if (githubApp) {
+    return githubApp
+  }
+
+  const appId = process.env.GITHUB_APP_ID
+  const privateKey = process.env.GITHUB_APP_PRIVATE_KEY
+
+  if (!appId || !privateKey) {
+    throw new Error('GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY environment variables are required')
+  }
+
+  githubApp = new App({
+    appId,
+    privateKey,
+  })
+
+  return githubApp
 }
 
-export const githubApp = new App({
-  appId,
-  privateKey,
-})
-
 export async function getInstallationClient(installationId: number | string): Promise<Octokit> {
-  const installationToken = await githubApp.getInstallationOctokit(Number(installationId))
+  const installationToken = await getGitHubApp().getInstallationOctokit(Number(installationId))
   return installationToken as unknown as Octokit
 }
 

@@ -27,17 +27,31 @@ export interface AgentLog {
   created_at: string
 }
 
-const dbUrl = process.env.TURSO_URL
-const dbToken = process.env.TURSO_AUTH_TOKEN
+let dbClient: ReturnType<typeof createClient> | null = null
 
-if (!dbUrl || !dbToken) {
-  throw new Error('TURSO_URL and TURSO_AUTH_TOKEN environment variables are required')
+function getDbClient() {
+  if (dbClient) {
+    return dbClient
+  }
+
+  const dbUrl = process.env.TURSO_URL
+  const dbToken = process.env.TURSO_AUTH_TOKEN
+
+  if (!dbUrl || !dbToken) {
+    throw new Error('TURSO_URL and TURSO_AUTH_TOKEN environment variables are required')
+  }
+
+  dbClient = createClient({
+    url: dbUrl,
+    authToken: dbToken,
+  })
+
+  return dbClient
 }
 
-export const db = createClient({
-  url: dbUrl,
-  authToken: dbToken,
-})
+export const db = {
+  execute: (...args: Parameters<ReturnType<typeof createClient>['execute']>) => getDbClient().execute(...args),
+}
 
 export async function getActiveTasks(): Promise<AgentTask[]> {
   const result = await db.execute('SELECT * FROM agent_tasks WHERE status != ? ORDER BY created_at DESC', ['complete'])
