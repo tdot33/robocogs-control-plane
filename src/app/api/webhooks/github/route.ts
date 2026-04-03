@@ -1,11 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { validateWebhookRequest } from '@/lib/webhook-validator'
+import { validateWebhookSignature } from '@/lib/webhook-validator'
 import { inngest } from '@/inngest/client'
 
 const WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET
+const WEBHOOK_FORWARD_URL = process.env.WEBHOOK_FORWARD_URL
+const WEBHOOK_FORWARD_AUTH_MODE = (process.env.WEBHOOK_FORWARD_AUTH_MODE || 'none').toLowerCase()
+const WEBHOOK_FORWARD_AUDIENCE = process.env.WEBHOOK_FORWARD_AUDIENCE
 
 if (!WEBHOOK_SECRET) {
   console.error('GITHUB_WEBHOOK_SECRET is not set!')
+}
+
+async function getCloudRunIdToken(audience: string): Promise<string> {
+  const tokenUrl =
+    'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=' +
+    encodeURIComponent(audience)
+
+  const response = await fetch(tokenUrl, {
+    headers: {
+      'Metadata-Flavor': 'Google',
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error(`Failed to mint Cloud Run identity token (${response.status})`)
+  }
+
+  return response.text()
+}
+
+async function forwardWebhook(request: NextRequest, body: string, eventType: string, signature: string): Promise<Response> {
+  if (!WEBHOOK_FORWARD_URL) {
+    throw new Error('WEBHOOK_FORWARD_URL is not configured')
+  }
+
+  const headers = new Headers({
+    'content-type': request.headers.get('content-type') || 'application/json',
+    'x-hub-signature-256': signature,
+    'x-github-event': eventType,
+    'x-github-delivery': request.headers.get('x-github-delivery') || '',
+    'x-forwarded-by': 'robocogs-ingress-bridge',
+  })
+
+  if (WEBHOOK_FORWARD_AUTH_MODE === 'oidc') {
+    const audience = WEBHOOK_FORWARD_AUDIENCE || WEBHOOK_FORWARD_URL
+    const idToken = await getCloudRunIdToken(audience)
+    headers.set('authorization', `Bearer ${idToken}`)
+  }
+
+  return fetch(WEBHOOK_FORWARD_URL, {
+    method: 'POST',
+    headers,
+    body,
+    signal: AbortSignal.timeout(10000),
+  })
 }
 
 /**
@@ -16,8 +64,8 @@ export async function POST(request: NextRequest) {
   try {
     // Get headers
     const signature = request.headers.get('x-hub-signature-256') || ''
-    const timestamp = request.headers.get('x-github-hook-id') || ''
     const eventType = request.headers.get('x-github-event') || ''
+    const forwardedBy = request.headers.get('x-forwarded-by') || ''
 
     if (!signature || !eventType) {
       return NextResponse.json(
@@ -37,10 +85,39 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!validateWebhookRequest(body, signature, timestamp, WEBHOOK_SECRET)) {
+    if (!validateWebhookSignature(body, signature, WEBHOOK_SECRET)) {
       return NextResponse.json(
         { error: 'Invalid signature' },
         { status: 401 }
+      )
+    }
+
+    // Bridge mode: validate at edge and forward to private backend.
+    if (WEBHOOK_FORWARD_URL) {
+      if (forwardedBy === 'robocogs-ingress-bridge') {
+        return NextResponse.json(
+          { error: 'Bridge forwarding loop detected' },
+          { status: 500 }
+        )
+      }
+
+      const forwardResponse = await forwardWebhook(request, body, eventType, signature)
+
+      if (!forwardResponse.ok) {
+        const details = await forwardResponse.text().catch(() => 'forwarding failed')
+        return NextResponse.json(
+          {
+            error: 'Failed to forward webhook',
+            downstreamStatus: forwardResponse.status,
+            details,
+          },
+          { status: 502 }
+        )
+      }
+
+      return NextResponse.json(
+        { message: 'Webhook validated and forwarded' },
+        { status: 202 }
       )
     }
 

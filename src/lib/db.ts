@@ -1,4 +1,4 @@
-import { createClient } from '@libsql/client'
+import { createClient, type InValue } from '@libsql/client'
 
 export type AgentRole = 'architect' | 'implementer' | 'auditor' | 'domain-specialist' | 'historian' | 'concierge-router'
 export type TaskStatus = 'pending' | 'running' | 'awaiting_approval' | 'approved' | 'rejected' | 'failed' | 'complete'
@@ -50,17 +50,18 @@ function getDbClient() {
 }
 
 export const db = {
-  execute: (...args: Parameters<ReturnType<typeof createClient>['execute']>) => getDbClient().execute(...args),
+  execute: (sql: string, args?: InValue[]) =>
+    getDbClient().execute(args ? { sql, args } : sql),
 }
 
 export async function getActiveTasks(): Promise<AgentTask[]> {
   const result = await db.execute('SELECT * FROM agent_tasks WHERE status != ? ORDER BY created_at DESC', ['complete'])
-  return result.rows as AgentTask[]
+  return result.rows as unknown as AgentTask[]
 }
 
 export async function getTaskById(taskId: string): Promise<AgentTask | null> {
   const result = await db.execute('SELECT * FROM agent_tasks WHERE id = ?', [taskId])
-  return (result.rows[0] as AgentTask) || null
+  return (result.rows[0] as unknown as AgentTask) || null
 }
 
 export async function updateTaskStatus(taskId: string, status: TaskStatus, progress?: number): Promise<void> {
@@ -96,5 +97,5 @@ export async function appendLog(taskId: string, agent: string, message: string, 
 
 export async function getTaskLogs(taskId: string): Promise<AgentLog[]> {
   const result = await db.execute('SELECT * FROM agent_logs WHERE task_id = ? ORDER BY created_at DESC LIMIT 100', [taskId])
-  return result.rows as AgentLog[]
+  return result.rows as unknown as AgentLog[]
 }

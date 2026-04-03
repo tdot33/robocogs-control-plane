@@ -1,5 +1,5 @@
 import { App } from '@octokit/app'
-import Octokit from '@octokit/rest'
+import { Octokit } from '@octokit/rest'
 
 let githubApp: App | null = null
 

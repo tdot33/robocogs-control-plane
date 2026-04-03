@@ -104,7 +104,8 @@ export const gateProcessor = inngest.createFunction(
       const approval = await step.waitForEvent('wait-for-approval', {
         event: 'orchestration/gate.approved',
         timeout: '7d',
-        match: { 'data.taskId': taskId },
+        // Inngest expects a field-path string here and compares values across events.
+        match: 'data.taskId',
       }).catch(async () => {
         // On timeout, update task to failed
         await updateTaskStatus(taskId, 'failed', 0)
