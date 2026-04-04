@@ -39,6 +39,7 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
     scopeSummary: '',
     rollbackNotes: '',
   })
+  const [repairAction, setRepairAction] = useState('normalize-task-state')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [loading, setLoading] = useState(true)
@@ -70,6 +71,7 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
       scopeSummary: '',
       rollbackNotes: '',
     })
+    setRepairAction('normalize-task-state')
 
     const fetchLogs = async () => {
       try {
@@ -128,6 +130,43 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
       onClose()
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to submit decision')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const runRepairAction = async () => {
+    try {
+      setIsSubmitting(true)
+      setErrorMessage('')
+      const response = await fetch(`/api/admin/tasks/${task.id}/repair`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: repairAction,
+        }),
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        throw new Error(payload.error || 'Failed to run repair action')
+      }
+
+      router.refresh()
+      const refreshed = await fetch(`/api/admin/tasks/${task.id}/logs`, { cache: 'no-store' })
+      if (refreshed.ok) {
+        const data = await refreshed.json()
+        setLogs(Array.isArray(data.logs) ? data.logs : [])
+        setPlanPackage(data.planPackage || null)
+        setImplementationPackage(data.implementationPackage || null)
+        setImplementationEvidence(data.implementationEvidence || null)
+        setAuditorReviewPackage(data.auditorReviewPackage || null)
+        setPromotionPackage(data.promotionPackage || null)
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to run repair action')
     } finally {
       setIsSubmitting(false)
     }
@@ -392,6 +431,34 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
                   ))
                 )}
               </div>
+            </div>
+
+            <div className="border-t border-[#30363d] p-6">
+              <h3 className="mb-3 font-semibold text-white">Repair / Backfill</h3>
+              <p className="mb-3 text-sm text-slate-400">
+                Use these admin-safe actions to rebuild missing packages or normalize a task that predates the current orchestration flow.
+              </p>
+              <select
+                value={repairAction}
+                onChange={(event) => setRepairAction(event.target.value)}
+                className="w-full rounded-md border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-[#c9d1d9] focus:outline-none focus:ring-2 focus:ring-[#1f6feb]"
+              >
+                <option value="normalize-task-state">Normalize task state</option>
+                <option value="regenerate-plan-package">Regenerate plan package</option>
+                <option value="regenerate-implementation-package">Regenerate implementation package</option>
+                <option value="regenerate-auditor-review-package">Regenerate auditor review package</option>
+                <option value="regenerate-promotion-package">Regenerate promotion package</option>
+              </select>
+              <button
+                onClick={() => {
+                  if (isSubmitting) return
+                  void runRepairAction()
+                }}
+                className="mt-3 w-full rounded border border-[#8b949e] bg-[#21262d] px-4 py-2 text-sm font-medium text-[#c9d1d9] transition-colors hover:border-white hover:bg-[#30363d] disabled:opacity-50"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Running repair...' : 'Run repair action'}
+              </button>
             </div>
           </div>
 
