@@ -2,9 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { ADMIN_SESSION_COOKIE, isAdminSessionValid } from '@/lib/admin-auth'
 import { inngest } from '@/inngest/client'
-import { appendLog, getTaskById, getTaskLogs, setTaskGate, updateTaskStatus } from '@/lib/db'
+import { appendLog, getTaskById, getTaskLogs, setTaskAgent, setTaskGate, updateTaskStatus } from '@/lib/db'
 import { findLatestMergeApprovalContext, getMergeApprovalReadiness } from '@/lib/merge-approval'
-import { buildImplementationEvidence, serializeImplementationEvidenceLog } from '@/lib/plan-package'
+import {
+  buildAuditorReviewPackage,
+  buildImplementationEvidence,
+  serializeAuditorReviewPackageLog,
+  serializeImplementationEvidenceLog,
+} from '@/lib/plan-package'
 
 interface ImplementationEvidenceBody {
   prUrl?: string
@@ -56,6 +61,13 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ta
 
   await appendLog(taskId, 'implementer', 'Submitted implementation evidence package')
   await appendLog(taskId, 'implementer', serializeImplementationEvidenceLog(evidence), 'debug')
+  const auditorReviewPackage = buildAuditorReviewPackage({
+    task,
+    implementationEvidence: evidence,
+  })
+  await setTaskAgent(taskId, 'auditor')
+  await appendLog(taskId, 'auditor', 'Assigned auditor to review submitted implementation evidence')
+  await appendLog(taskId, 'auditor', serializeAuditorReviewPackageLog(auditorReviewPackage), 'debug')
   await updateTaskStatus(taskId, 'running', Math.max(task.progress, 65))
 
   const logs = await getTaskLogs(taskId)
@@ -85,5 +97,5 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ta
     await appendLog(taskId, 'implementer', 'Implementation evidence recorded; awaiting CI success before opening merge approval')
   }
 
-  return NextResponse.json({ ok: true, taskId, evidence })
+  return NextResponse.json({ ok: true, taskId, evidence, auditorReviewPackage })
 }

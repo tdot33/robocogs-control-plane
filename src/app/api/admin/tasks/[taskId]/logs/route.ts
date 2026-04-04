@@ -3,9 +3,12 @@ import { cookies } from 'next/headers'
 import { ADMIN_SESSION_COOKIE, isAdminSessionValid } from '@/lib/admin-auth'
 import { getLatestGateApproval, getTaskById, getTaskLogs } from '@/lib/db'
 import {
+  buildAuditorReviewPackage,
   buildImplementationPackage,
   parseImplementationEvidenceLog,
+  parseAuditorReviewPackageLog,
   buildPlanPackage,
+  type AuditorReviewPackage,
   type ImplementationEvidence,
   parseImplementationPackageLog,
   parsePlanPackageLog,
@@ -70,6 +73,17 @@ function extractImplementationEvidence(logs: LogPayload[]): ImplementationEviden
   return null
 }
 
+function extractAuditorReviewPackage(logs: LogPayload[]): AuditorReviewPackage | null {
+  for (const log of logs) {
+    const auditorReviewPackage = parseAuditorReviewPackageLog(log.message)
+    if (auditorReviewPackage) {
+      return auditorReviewPackage
+    }
+  }
+
+  return null
+}
+
 async function loadPlanPackage(taskId: string, logs: LogPayload[]) {
   const loggedPlanPackage = extractPlanPackage(logs)
   if (loggedPlanPackage) {
@@ -128,6 +142,25 @@ async function loadImplementationPackage(taskId: string, logs: LogPayload[]) {
   return buildImplementationPackage({ task, answers, note })
 }
 
+async function loadAuditorReviewPackage(taskId: string, logs: LogPayload[]) {
+  const loggedAuditorReviewPackage = extractAuditorReviewPackage(logs)
+  if (loggedAuditorReviewPackage) {
+    return loggedAuditorReviewPackage
+  }
+
+  const task = await getTaskById(taskId)
+  if (!task || !task.gate_current || !['implementation', 'merge-approval', 'promotion-approval', 'done'].includes(task.gate_current)) {
+    return null
+  }
+
+  const implementationEvidence = extractImplementationEvidence(logs)
+  if (!implementationEvidence) {
+    return null
+  }
+
+  return buildAuditorReviewPackage({ task, implementationEvidence })
+}
+
 export async function GET(_request: NextRequest, context: { params: Promise<{ taskId: string }> }) {
   const cookieStore = await cookies()
   const sessionCookie = cookieStore.get(ADMIN_SESSION_COOKIE)?.value
@@ -146,12 +179,14 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ ta
     (log) =>
       !parsePlanPackageLog(log.message) &&
       !parseImplementationPackageLog(log.message) &&
-      !parseImplementationEvidenceLog(log.message)
+      !parseImplementationEvidenceLog(log.message) &&
+      !parseAuditorReviewPackageLog(log.message)
   )
   return NextResponse.json({
     logs: filteredLogs,
     planPackage: await loadPlanPackage(taskId, logs as LogPayload[]),
     implementationPackage: await loadImplementationPackage(taskId, logs as LogPayload[]),
     implementationEvidence: extractImplementationEvidence(logs as LogPayload[]),
+    auditorReviewPackage: await loadAuditorReviewPackage(taskId, logs as LogPayload[]),
   })
 }

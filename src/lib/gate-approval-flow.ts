@@ -68,6 +68,11 @@ export async function applyApprovedGateTransition(input: {
     await appendLog(input.taskId, 'implementer', serializeImplementationPackageLog(implementationPackage), 'debug')
   }
 
+  if (input.gateName === 'merge-approval' || input.gateName === 'promotion-approval') {
+    await setTaskAgent(input.taskId, 'historian')
+    await appendLog(input.taskId, 'historian', 'Assigned historian for closeout and final audit trail capture')
+  }
+
   const approverSuffix = input.approvedBy ? ` by ${input.approvedBy}` : ''
   await appendLog(
     input.taskId,
