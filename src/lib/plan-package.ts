@@ -60,6 +60,19 @@ export interface AuditorReviewPackage {
 
 export const AUDITOR_REVIEW_PACKAGE_LOG_PREFIX = '[auditor-review-package] '
 
+export interface PromotionPackage {
+  version: number
+  generatedAt: string
+  taskId: string
+  sourceGate: 'promotion-approval'
+  summary: string
+  releaseContext: string[]
+  founderChecklist: string[]
+  rollbackExpectations: string[]
+}
+
+export const PROMOTION_PACKAGE_LOG_PREFIX = '[promotion-package] '
+
 export function buildPlanPackage(input: {
   task: AgentTask
   answers: Record<string, string>
@@ -239,6 +252,42 @@ export function serializeAuditorReviewPackageLog(auditorReviewPackage: AuditorRe
   return `${AUDITOR_REVIEW_PACKAGE_LOG_PREFIX}${JSON.stringify(auditorReviewPackage)}`
 }
 
+export function buildPromotionPackage(input: {
+  task: AgentTask
+  prNumber: number
+  baseBranch: string
+  headBranch: string
+  htmlUrl: string
+}): PromotionPackage {
+  const { task, prNumber, baseBranch, headBranch, htmlUrl } = input
+
+  return {
+    version: 1,
+    generatedAt: new Date().toISOString(),
+    taskId: task.id,
+    sourceGate: 'promotion-approval',
+    summary: `Promotion review for ${task.task_name}. Founder approval is required before promoting ${headBranch} into ${baseBranch}.`,
+    releaseContext: [
+      `Promotion PR #${prNumber} is the proposed path from ${headBranch} to ${baseBranch}.`,
+      `Review URL: ${htmlUrl}.`,
+      'This promotion task is separate from work-branch merge approval and exists to capture production-release intent explicitly.',
+    ],
+    founderChecklist: [
+      'Confirm staging or integration validation on the source branch is complete.',
+      'Confirm release CI status and any final release notes are acceptable for production promotion.',
+      'Confirm the production rollback path is still valid for the commits included in this promotion PR.',
+    ],
+    rollbackExpectations: [
+      `If promotion risk changes, hold or close the ${headBranch} -> ${baseBranch} PR rather than bypassing the gate.`,
+      'Record any production hold reason in orchestration logs so historian closeout has a complete release trail.',
+    ],
+  }
+}
+
+export function serializePromotionPackageLog(promotionPackage: PromotionPackage): string {
+  return `${PROMOTION_PACKAGE_LOG_PREFIX}${JSON.stringify(promotionPackage)}`
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
@@ -331,6 +380,23 @@ function normalizeAuditorReviewPackage(value: unknown): AuditorReviewPackage | n
   }
 }
 
+function normalizePromotionPackage(value: unknown): PromotionPackage | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  return {
+    version: asNumber(value.version),
+    generatedAt: asString(value.generatedAt),
+    taskId: asString(value.taskId),
+    sourceGate: 'promotion-approval',
+    summary: asString(value.summary),
+    releaseContext: asStringArray(value.releaseContext),
+    founderChecklist: asStringArray(value.founderChecklist),
+    rollbackExpectations: asStringArray(value.rollbackExpectations),
+  }
+}
+
 export function parsePlanPackageLog(message: string): PlanPackage | null {
   if (!message.startsWith(PLAN_PACKAGE_LOG_PREFIX)) {
     return null
@@ -374,6 +440,18 @@ export function parseAuditorReviewPackageLog(message: string): AuditorReviewPack
 
   try {
     return normalizeAuditorReviewPackage(JSON.parse(message.slice(AUDITOR_REVIEW_PACKAGE_LOG_PREFIX.length)))
+  } catch {
+    return null
+  }
+}
+
+export function parsePromotionPackageLog(message: string): PromotionPackage | null {
+  if (!message.startsWith(PROMOTION_PACKAGE_LOG_PREFIX)) {
+    return null
+  }
+
+  try {
+    return normalizePromotionPackage(JSON.parse(message.slice(PROMOTION_PACKAGE_LOG_PREFIX.length)))
   } catch {
     return null
   }
