@@ -5,6 +5,25 @@ export interface BranchIssueValidation {
   message: string
 }
 
+export function parseIssueNumber(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) {
+    return ''
+  }
+
+  const trimmed = String(value).trim()
+  if (!trimmed) {
+    return ''
+  }
+
+  const direct = trimmed.match(/^#?(\d+)$/)
+  if (direct) {
+    return direct[1]
+  }
+
+  const fromUrl = trimmed.match(/\/issues\/(\d+)/i)
+  return fromUrl ? fromUrl[1] : ''
+}
+
 export function inferIssueFromBranchName(branchName = ''): string {
   if (!branchName) {
     return ''
@@ -19,13 +38,22 @@ export function inferIssueFromBranchName(branchName = ''): string {
   return issueMatch ? issueMatch[1] : ''
 }
 
+export function getBranchType(branchName = ''): string {
+  const match = branchName.match(/^(feature|fix|hotfix|docs|chore)\//)
+  return match ? match[1] : ''
+}
+
 export function branchRequiresIssue(branchName = ''): boolean {
   return /^(feature|fix|hotfix)\//.test(branchName)
 }
 
+export function resolveCanonicalIssue(input: { branchName?: string | null; explicitIssue?: string | number | null } = {}): string {
+  return parseIssueNumber(input.explicitIssue) || inferIssueFromBranchName(input.branchName || '')
+}
+
 export function validateTaskIssueBranchPair(branchName: string | null | undefined, issueNumber: number | null | undefined): BranchIssueValidation {
   const branch = String(branchName || '').trim()
-  const issue = issueNumber ? String(issueNumber) : ''
+  const explicitIssue = parseIssueNumber(issueNumber)
 
   if (!branch) {
     return {
@@ -44,11 +72,11 @@ export function validateTaskIssueBranchPair(branchName: string | null | undefine
       status: 'not-required',
       requiresIssue,
       inferredIssue,
-      message: 'Branch type does not require an issue-bound implementation guard.',
+      message: `Branch ${branch} is a ${getBranchType(branch) || 'non-work'} branch and does not require an issue-bound implementation guard.`,
     }
   }
 
-  if (!issue) {
+  if (!explicitIssue) {
     return {
       status: 'missing-issue',
       requiresIssue,
@@ -62,16 +90,17 @@ export function validateTaskIssueBranchPair(branchName: string | null | undefine
       status: 'mismatch',
       requiresIssue,
       inferredIssue,
-      message: `Branch ${branch} requires an inferable issue number before implementation can proceed.`,
+      message: `Branch ${branch} requires an inferable canonical issue before implementation can proceed.`,
     }
   }
 
-  if (inferredIssue !== issue) {
+  const canonicalIssue = resolveCanonicalIssue({ branchName: branch, explicitIssue })
+  if (canonicalIssue !== explicitIssue || inferredIssue !== explicitIssue) {
     return {
       status: 'mismatch',
       requiresIssue,
       inferredIssue,
-      message: `Branch ${branch} resolves to issue #${inferredIssue}, but the task is linked to issue #${issue}.`,
+      message: `Branch ${branch} resolves to issue #${inferredIssue}, but the task is linked to issue #${explicitIssue}.`,
     }
   }
 
@@ -79,6 +108,6 @@ export function validateTaskIssueBranchPair(branchName: string | null | undefine
     status: 'valid',
     requiresIssue,
     inferredIssue,
-    message: `Branch ${branch} correctly resolves to issue #${issue}.`,
+    message: `Branch ${branch} correctly resolves to issue #${explicitIssue}.`,
   }
 }

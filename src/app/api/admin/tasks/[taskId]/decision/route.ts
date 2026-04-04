@@ -84,8 +84,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ta
     await updateTaskStatus(taskId, transition.nextStatus, transition.nextProgress)
     await setTaskGate(taskId, transition.nextGate)
     if (gateName === 'plan-approval') {
-      await setTaskAgent(taskId, 'implementer')
       const traceability = validateTaskIssueBranchPair(task.branch, task.issue_number)
+      await setTaskAgent(taskId, 'implementer')
       await appendLog(taskId, 'traceability-guard', traceability.message)
     }
     await appendLog(
