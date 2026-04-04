@@ -15,13 +15,13 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.12),_transparent_25%),linear-gradient(180deg,#020617_0%,#0f172a_55%,#111827_100%)] px-4">
-      <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-950/85 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.55)] backdrop-blur">
+    <div className="flex min-h-screen items-center justify-center bg-[#0d1117] px-4">
+      <div className="w-full max-w-md rounded-2xl border border-[#30363d] bg-[#161b22] p-6 shadow-[0_16px_40px_rgba(1,4,9,0.35)]">
         <h1 className="text-2xl font-semibold text-white">Control Surface Login</h1>
         <p className="mt-2 text-sm text-slate-300">Sign in to access orchestration controls.</p>
 
         {errorMessage ? (
-          <div className="mt-4 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
+          <div className="mt-4 rounded-md border border-[#6e2f36] bg-[#2d1617] px-3 py-2 text-sm text-[#f85149]">
             {errorMessage}
           </div>
         ) : null}
@@ -34,7 +34,7 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
               name="username"
               autoComplete="username"
               required
-              className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              className="mt-1 w-full rounded-md border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-[#c9d1d9] focus:outline-none focus:ring-2 focus:ring-[#1f6feb]"
             />
           </label>
           <label className="block text-sm font-medium text-slate-200">
@@ -44,12 +44,12 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
               type="password"
               autoComplete="current-password"
               required
-              className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              className="mt-1 w-full rounded-md border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-[#c9d1d9] focus:outline-none focus:ring-2 focus:ring-[#1f6feb]"
             />
           </label>
           <button
             type="submit"
-            className="w-full rounded-md bg-cyan-500 py-2.5 text-sm font-medium text-slate-950 hover:bg-cyan-400"
+            className="w-full rounded-md bg-[#1f6feb] py-2.5 text-sm font-medium text-white hover:bg-[#388bfd]"
           >
             Sign In
           </button>

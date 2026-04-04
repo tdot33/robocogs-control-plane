@@ -23,7 +23,7 @@ export default async function OrchestrationPage() {
   const tasksData = (tasks.rows || []) as any[]
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.12),_transparent_28%),linear-gradient(180deg,#020617_0%,#0f172a_55%,#111827_100%)] px-4 py-8 text-slate-100">
+    <div className="min-h-screen bg-[linear-gradient(180deg,#0d1117_0%,#0d1117_100%)] px-4 py-8 text-slate-100">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8 flex items-start justify-between gap-4">
@@ -36,7 +36,7 @@ export default async function OrchestrationPage() {
           <form method="POST" action="/api/admin/logout">
             <button
               type="submit"
-              className="rounded-md border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm font-medium text-slate-100 shadow-[0_0_0_1px_rgba(255,255,255,0.04)] hover:bg-slate-800"
+              className="rounded-md border border-[#30363d] bg-[#161b22] px-3 py-2 text-sm font-medium text-[#c9d1d9] hover:border-[#8b949e] hover:bg-[#1c2128]"
             >
               Sign Out
             </button>
@@ -60,8 +60,8 @@ export default async function OrchestrationPage() {
         </div>
 
         {/* Main Table */}
-        <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/75 shadow-[0_24px_80px_rgba(2,6,23,0.45)] backdrop-blur">
-          <div className="border-b border-slate-800 px-6 py-4">
+        <div className="overflow-hidden rounded-2xl border border-[#30363d] bg-[#161b22] shadow-[0_16px_40px_rgba(1,4,9,0.35)]">
+          <div className="border-b border-[#30363d] px-6 py-4">
             <h2 className="text-xl font-semibold text-white">Active Tasks</h2>
           </div>
           <AgentTasksTable tasks={tasksData} />
@@ -73,14 +73,14 @@ export default async function OrchestrationPage() {
 
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
   const colors = {
-    blue: 'border-sky-500/30 bg-sky-500/10 text-sky-100',
-    amber: 'border-amber-500/30 bg-amber-500/10 text-amber-100',
-    green: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100',
-    red: 'border-rose-500/30 bg-rose-500/10 text-rose-100',
+    blue: 'border-[#30363d] bg-[#161b22] text-[#c9d1d9]',
+    amber: 'border-[#5e4429] bg-[#2d210f] text-[#e3b341]',
+    green: 'border-[#1f5132] bg-[#12261e] text-[#3fb950]',
+    red: 'border-[#6e2f36] bg-[#2d1617] text-[#f85149]',
   }
 
   return (
-    <div className={`${colors[color as keyof typeof colors]} rounded-2xl border p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]`}>
+    <div className={`${colors[color as keyof typeof colors]} rounded-2xl border p-4`}>
       <p className="text-sm font-medium opacity-80">{label}</p>
       <p className="text-3xl font-bold mt-1">{value}</p>
     </div>
