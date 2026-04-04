@@ -7,6 +7,7 @@ export interface PlanPackage {
   sourceGate: string
   summary: string
   objectives: string[]
+  executionPolicy: string[]
   implementationSteps: string[]
   validationSteps: string[]
   rollbackSteps: string[]
@@ -14,6 +15,21 @@ export interface PlanPackage {
 }
 
 export const PLAN_PACKAGE_LOG_PREFIX = '[plan-package] '
+
+export interface ImplementationPackage {
+  version: number
+  generatedAt: string
+  taskId: string
+  sourceGate: string
+  summary: string
+  executionPolicy: string[]
+  implementationChecklist: string[]
+  validationSteps: string[]
+  mergePolicy: string[]
+  riskNotes: string[]
+}
+
+export const IMPLEMENTATION_PACKAGE_LOG_PREFIX = '[implementation-package] '
 
 export function buildPlanPackage(input: {
   task: AgentTask
@@ -26,6 +42,9 @@ export function buildPlanPackage(input: {
 
   const branchContext = task.branch ? `Work on branch ${task.branch}.` : 'Work on the task branch created by work:start.'
   const issueContext = task.issue_number ? `Track implementation evidence against issue #${task.issue_number}.` : 'Track implementation evidence against the orchestration task.'
+  const trackedBranchPolicy = task.branch
+    ? `Apply changes on ${task.branch} and push updates to origin/${task.branch} before requesting merge review.`
+    : 'Apply changes on the tracked work branch and push it before requesting merge review.'
 
   return {
     version: 1,
@@ -38,9 +57,14 @@ export function buildPlanPackage(input: {
       issueContext,
       'Preserve existing production behavior outside the approved scope.',
     ],
+    executionPolicy: [
+      trackedBranchPolicy,
+      'Do not retarget work onto master during implementation. Keep execution on the tracked work branch.',
+      'Use the repository workflow helpers when needed: work:start establishes the branch, and work:pr opens or updates the review path.',
+    ],
     implementationSteps: [
       'Inspect the target workflow and identify the root change required for the requested behavior.',
-      'Apply the code change on the tracked branch using the repository workflow and traceability rules.',
+      'Apply the code change on the tracked branch using the repository workflow and branch policy.',
       'Update any directly impacted automation, validation, or documentation paths needed for a safe merge.',
     ],
     validationSteps: [
@@ -60,8 +84,115 @@ export function buildPlanPackage(input: {
   }
 }
 
+export function buildImplementationPackage(input: {
+  task: AgentTask
+  answers: Record<string, string>
+  note?: string
+}): ImplementationPackage {
+  const { task, answers, note } = input
+  const trackedBranch = task.branch || 'the tracked work branch'
+  const planSound = answers['plan-sound'] === 'yes'
+  const validationReady = answers['testability'] === 'yes'
+  const rollbackReady = answers['rollback-ready'] === 'yes'
+
+  return {
+    version: 1,
+    generatedAt: new Date().toISOString(),
+    taskId: task.id,
+    sourceGate: 'plan-approval',
+    summary: `Implementation handoff for ${task.task_name}. Execute on ${trackedBranch} and keep merge flow off master until review is complete.`,
+    executionPolicy: [
+      `Make all code changes on ${trackedBranch}.`,
+      task.branch
+        ? `Push commits to origin/${task.branch} before requesting merge approval.`
+        : 'Push the tracked work branch before requesting merge approval.',
+      'Do not merge directly to master from agent work. Open or update the review branch/PR first, then follow the repository promotion path.',
+    ],
+    implementationChecklist: [
+      'Execute only the approved scope from the plan package and avoid unrelated cleanup.',
+      'Keep diffs surgical and aligned with existing repository patterns.',
+      'Record validation evidence and any scope escalations in orchestration logs before requesting the next gate.',
+    ],
+    validationSteps: [
+      validationReady
+        ? 'Run the planned validation commands and capture pass/fail results in the task log.'
+        : 'Define and run the minimum safe validation set before requesting merge approval.',
+      'Re-check the final branch diff against the approved scope before handoff.',
+    ],
+    mergePolicy: [
+      'Use work:pr or the equivalent repository PR flow from the tracked branch.',
+      'Keep master merges behind the repository\'s normal review and promotion path.',
+      'Request merge approval only after the work branch is pushed and validation evidence is attached.',
+    ],
+    riskNotes: [
+      planSound ? 'Plan approval confirmed the proposed implementation shape.' : 'Plan soundness was not explicitly confirmed; validate change shape before coding.',
+      rollbackReady ? 'Rollback strategy was confirmed at plan approval.' : 'Rollback strategy was not fully confirmed; document rollback details during implementation.',
+      note ? `Plan approval note: ${note}` : 'No additional plan approval note was provided.',
+    ],
+  }
+}
+
 export function serializePlanPackageLog(planPackage: PlanPackage): string {
   return `${PLAN_PACKAGE_LOG_PREFIX}${JSON.stringify(planPackage)}`
+}
+
+export function serializeImplementationPackageLog(implementationPackage: ImplementationPackage): string {
+  return `${IMPLEMENTATION_PACKAGE_LOG_PREFIX}${JSON.stringify(implementationPackage)}`
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function asString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback
+}
+
+function asNumber(value: unknown, fallback = 1): number {
+  return typeof value === 'number' ? value : fallback
+}
+
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+}
+
+function normalizePlanPackage(value: unknown): PlanPackage | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  return {
+    version: asNumber(value.version),
+    generatedAt: asString(value.generatedAt),
+    taskId: asString(value.taskId),
+    sourceGate: asString(value.sourceGate),
+    summary: asString(value.summary),
+    objectives: asStringArray(value.objectives),
+    executionPolicy: asStringArray(value.executionPolicy),
+    implementationSteps: asStringArray(value.implementationSteps),
+    validationSteps: asStringArray(value.validationSteps),
+    rollbackSteps: asStringArray(value.rollbackSteps),
+    riskNotes: asStringArray(value.riskNotes),
+  }
+}
+
+function normalizeImplementationPackage(value: unknown): ImplementationPackage | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  return {
+    version: asNumber(value.version),
+    generatedAt: asString(value.generatedAt),
+    taskId: asString(value.taskId),
+    sourceGate: asString(value.sourceGate),
+    summary: asString(value.summary),
+    executionPolicy: asStringArray(value.executionPolicy),
+    implementationChecklist: asStringArray(value.implementationChecklist),
+    validationSteps: asStringArray(value.validationSteps),
+    mergePolicy: asStringArray(value.mergePolicy),
+    riskNotes: asStringArray(value.riskNotes),
+  }
 }
 
 export function parsePlanPackageLog(message: string): PlanPackage | null {
@@ -70,7 +201,19 @@ export function parsePlanPackageLog(message: string): PlanPackage | null {
   }
 
   try {
-    return JSON.parse(message.slice(PLAN_PACKAGE_LOG_PREFIX.length)) as PlanPackage
+    return normalizePlanPackage(JSON.parse(message.slice(PLAN_PACKAGE_LOG_PREFIX.length)))
+  } catch {
+    return null
+  }
+}
+
+export function parseImplementationPackageLog(message: string): ImplementationPackage | null {
+  if (!message.startsWith(IMPLEMENTATION_PACKAGE_LOG_PREFIX)) {
+    return null
+  }
+
+  try {
+    return normalizeImplementationPackage(JSON.parse(message.slice(IMPLEMENTATION_PACKAGE_LOG_PREFIX.length)))
   } catch {
     return null
   }
