@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import { App } from '@octokit/app'
 import { Octokit } from '@octokit/rest'
 
@@ -15,9 +16,20 @@ function getGitHubApp() {
     throw new Error('GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY environment variables are required')
   }
 
+  const normalizedPrivateKey = crypto
+    .createPrivateKey({
+      key: privateKey.trim().replace(/\\n/g, '\n').replace(/^"|"$/g, ''),
+      format: 'pem',
+    })
+    .export({
+      format: 'pem',
+      type: 'pkcs8',
+    })
+    .toString()
+
   githubApp = new App({
     appId,
-    privateKey,
+    privateKey: normalizedPrivateKey,
   })
 
   return githubApp
