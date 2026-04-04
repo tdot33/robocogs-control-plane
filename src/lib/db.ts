@@ -104,6 +104,13 @@ export async function setTaskGate(taskId: string, gateName: string | null): Prom
   )
 }
 
+export async function setTaskAgent(taskId: string, assignedAgent: AgentRole): Promise<void> {
+  await db.execute(
+    'UPDATE agent_tasks SET assigned_agent = ?, updated_at = datetime(?) WHERE id = ?',
+    [assignedAgent, new Date().toISOString(), taskId]
+  )
+}
+
 export async function createTask(task: Omit<AgentTask, 'created_at' | 'updated_at'>): Promise<AgentTask> {
   const now = new Date().toISOString()
   await db.execute(

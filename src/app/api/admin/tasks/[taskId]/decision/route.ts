@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { ADMIN_SESSION_COOKIE, isAdminSessionValid } from '@/lib/admin-auth'
-import { appendLog, createGateApproval, getTaskById, setTaskGate, updateTaskStatus } from '@/lib/db'
+import { appendLog, createGateApproval, getTaskById, setTaskAgent, setTaskGate, updateTaskStatus } from '@/lib/db'
 import { areGateAnswersComplete, getApprovalTransition } from '@/lib/gates'
+import { buildPlanPackage, serializePlanPackageLog } from '@/lib/plan-package'
 
 interface DecisionBody {
   decision?: 'approve' | 'reject'
@@ -61,9 +62,22 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ta
       answers: approvalAnswers,
     })
 
+    if (gateName === 'intake') {
+      const planPackage = buildPlanPackage({
+        task,
+        answers,
+        note,
+      })
+      await appendLog(taskId, 'architect', 'Generated plan package for plan approval')
+      await appendLog(taskId, 'architect', serializePlanPackageLog(planPackage), 'debug')
+    }
+
     const transition = getApprovalTransition(gateName)
     await updateTaskStatus(taskId, transition.nextStatus, transition.nextProgress)
     await setTaskGate(taskId, transition.nextGate)
+    if (gateName === 'plan-approval') {
+      await setTaskAgent(taskId, 'implementer')
+    }
     await appendLog(
       taskId,
       actor,

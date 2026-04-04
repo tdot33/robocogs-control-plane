@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import type { TaskData } from './agent-tasks-table'
 import { areGateAnswersComplete, getGatePack, getGateTimelineState } from '@/lib/gates'
+import type { PlanPackage } from '@/lib/plan-package'
 
 interface TaskReviewDrawerProps {
   task: TaskData
@@ -24,6 +25,7 @@ interface AgentLog {
 export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProps) {
   const router = useRouter()
   const [logs, setLogs] = useState<AgentLog[]>([])
+  const [planPackage, setPlanPackage] = useState<PlanPackage | null>(null)
   const [gateAnswers, setGateAnswers] = useState<Record<string, string>>({})
   const [note, setNote] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -61,8 +63,10 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
         }
         const data = await response.json()
         setLogs(Array.isArray(data.logs) ? data.logs : [])
+        setPlanPackage(data.planPackage || null)
       } catch (error) {
         setLogs([])
+        setPlanPackage(null)
         setErrorMessage(error instanceof Error ? error.message : 'Failed to load logs')
       } finally {
         setLoading(false)
@@ -201,6 +205,21 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
               </div>
             </div>
 
+            {planPackage ? (
+              <div className="border-b border-[#30363d] p-6">
+                <h3 className="mb-3 font-semibold text-white">Plan Package</h3>
+                <p className="text-sm text-slate-300">{planPackage.summary}</p>
+
+                <div className="mt-4 space-y-4 text-sm text-slate-200">
+                  <PlanList title="Objectives" items={planPackage.objectives} />
+                  <PlanList title="Implementation" items={planPackage.implementationSteps} />
+                  <PlanList title="Validation" items={planPackage.validationSteps} />
+                  <PlanList title="Rollback" items={planPackage.rollbackSteps} />
+                  <PlanList title="Risk Notes" items={planPackage.riskNotes} />
+                </div>
+              </div>
+            ) : null}
+
             {gatePack ? (
               <div className="border-b border-[#30363d] p-6">
                 <h3 className="mb-3 font-semibold text-white">Gate Questions</h3>
@@ -310,5 +329,20 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
       </div>
     </>,
     document.body
+  )
+}
+
+function PlanList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div>
+      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</h4>
+      <ul className="space-y-2">
+        {items.map((item) => (
+          <li key={item} className="rounded border border-[#30363d] bg-[#0d1117] px-3 py-2 text-slate-200">
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }

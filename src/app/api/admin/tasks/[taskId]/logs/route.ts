@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { ADMIN_SESSION_COOKIE, isAdminSessionValid } from '@/lib/admin-auth'
 import { getTaskLogs } from '@/lib/db'
+import { parsePlanPackageLog } from '@/lib/plan-package'
 
-function filterSupersededLogs(logs: Array<{ message: string; created_at: string }>) {
+interface LogPayload {
+  message: string
+  created_at: string
+}
+
+function filterSupersededLogs(logs: LogPayload[]) {
   const latestIntakeCommentSuccess = logs
     .filter((log) => log.message.startsWith('Posted intake gate comment:'))
     .map((log) => Date.parse(log.created_at))
@@ -24,6 +30,17 @@ function filterSupersededLogs(logs: Array<{ message: string; created_at: string 
   })
 }
 
+function extractPlanPackage(logs: LogPayload[]) {
+  for (const log of logs) {
+    const planPackage = parsePlanPackageLog(log.message)
+    if (planPackage) {
+      return planPackage
+    }
+  }
+
+  return null
+}
+
 export async function GET(_request: NextRequest, context: { params: Promise<{ taskId: string }> }) {
   const cookieStore = await cookies()
   const sessionCookie = cookieStore.get(ADMIN_SESSION_COOKIE)?.value
@@ -38,5 +55,9 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ ta
   }
 
   const logs = await getTaskLogs(taskId)
-  return NextResponse.json({ logs: filterSupersededLogs(logs as Array<{ message: string; created_at: string }>) })
+  const filteredLogs = filterSupersededLogs(logs as LogPayload[]).filter((log) => !parsePlanPackageLog(log.message))
+  return NextResponse.json({
+    logs: filteredLogs,
+    planPackage: extractPlanPackage(logs as LogPayload[]),
+  })
 }
