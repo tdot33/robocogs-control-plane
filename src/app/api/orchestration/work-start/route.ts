@@ -1,8 +1,18 @@
 import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { appendLog, createTask, getTaskByBranch, getTaskByIssueNumber } from '@/lib/db'
+import { appendLog, createWorkStartTaskIfAllowed } from '@/lib/db'
 import { createIssueComment, getRepoInstallationId } from '@/lib/github'
 import { formatGateQuestionComment } from '@/inngest/gate-processor'
+
+const KNOWN_SCOPE_SLICES = new Set([
+  'auth-and-host-surface',
+  'invoice-processing',
+  'workflow-and-api',
+  'category-and-gl-mapping',
+  'analytics-instrumentation',
+  'docs-and-workflow',
+])
+const MAX_CONCURRENT_SESSIONS = 3
 
 interface WorkStartPayload {
   workKey?: string
@@ -10,6 +20,7 @@ interface WorkStartPayload {
   title?: string
   issueNumber?: number
   branchName?: string
+  scopeSlice?: string
   repoOwner?: string
   repoName?: string
 }
@@ -51,6 +62,7 @@ export async function POST(request: NextRequest) {
   const repoOwner = String(body.repoOwner || '').trim()
   const repoName = String(body.repoName || '').trim()
   const workKey = String(body.workKey || '').trim()
+  const scopeSlice = String(body.scopeSlice || '').trim().toLowerCase()
   const issueNumber = Number(body.issueNumber || 0)
   const taskType = String(body.type || '').trim() || 'feature'
 
@@ -58,14 +70,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  const existingTask = issueNumber ? await getTaskByIssueNumber(issueNumber) : await getTaskByBranch(branchName)
-  if (existingTask) {
-    await appendLog(existingTask.id, 'work-start-intake', `Observed work:start handoff for branch ${branchName}`)
-    return NextResponse.json({ ok: true, taskId: existingTask.id, created: false })
+  if (scopeSlice && !KNOWN_SCOPE_SLICES.has(scopeSlice)) {
+    return NextResponse.json({ error: `Unsupported scope slice: ${scopeSlice}` }, { status: 400 })
   }
 
   const taskId = buildTaskId({ workKey, issueNumber })
-  await createTask({
+  const createResult = await createWorkStartTaskIfAllowed({
     id: taskId,
     task_name: title,
     assigned_agent: 'architect',
@@ -73,11 +83,35 @@ export async function POST(request: NextRequest) {
     progress: 10,
     branch: branchName,
     issue_number: issueNumber || null,
-    scope_slice: null,
+    scope_slice: scopeSlice || null,
     gate_current: 'intake',
+    maxConcurrentSessions: MAX_CONCURRENT_SESSIONS,
   })
 
-  await appendLog(taskId, 'work-start-intake', `Created orchestration task from work:start (${taskType})`)
+  if (createResult.outcome === 'existing') {
+    await appendLog(createResult.task.id, 'work-start-intake', `Observed work:start handoff for branch ${branchName}`)
+    return NextResponse.json({ ok: true, taskId: createResult.task.id, created: false })
+  }
+
+  if (createResult.outcome === 'scope-conflict') {
+    return NextResponse.json(
+      {
+        error: `Scope slice ${scopeSlice} is already active on task ${createResult.task?.id}. Re-sequence the work or request explicit overlap approval.`,
+        conflictingTaskId: createResult.task?.id,
+      },
+      { status: 409 }
+    )
+  }
+
+  if (createResult.outcome === 'session-limit') {
+    return NextResponse.json(
+      { error: `Concurrent implementation limit reached (${MAX_CONCURRENT_SESSIONS}). Finish or resequence an active session before starting another.` },
+      { status: 429 }
+    )
+  }
+
+  const scopeSuffix = scopeSlice ? `, scope ${scopeSlice}` : ''
+  await appendLog(createResult.task.id, 'work-start-intake', `Created orchestration task from work:start (${taskType}${scopeSuffix})`)
 
   if (issueNumber > 0) {
     try {
@@ -87,13 +121,13 @@ export async function POST(request: NextRequest) {
         repoOwner,
         repoName,
         issueNumber,
-        formatGateQuestionComment('intake', taskId)
+        formatGateQuestionComment('intake', createResult.task.id)
       )
-      await appendLog(taskId, 'work-start-intake', `Posted intake gate comment: ${comment.url}`)
+      await appendLog(createResult.task.id, 'work-start-intake', `Posted intake gate comment: ${comment.url}`)
     } catch (error) {
-      await appendLog(taskId, 'work-start-intake', `Failed to post intake gate comment: ${error}`, 'warn')
+      await appendLog(createResult.task.id, 'work-start-intake', `Failed to post intake gate comment: ${error}`, 'warn')
     }
   }
 
-  return NextResponse.json({ ok: true, taskId, created: true })
+  return NextResponse.json({ ok: true, taskId: createResult.task.id, created: true })
 }
