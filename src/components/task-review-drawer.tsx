@@ -376,7 +376,11 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
   )
 }
 
-function PlanList({ title, items }: { title: string; items: string[] }) {
+function PlanList({ title, items }: { title: string; items?: string[] }) {
+  if (!items?.length) {
+    return null
+  }
+
   return (
     <div>
       <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</h4>

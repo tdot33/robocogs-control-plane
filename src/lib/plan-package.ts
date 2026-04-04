@@ -140,13 +140,68 @@ export function serializeImplementationPackageLog(implementationPackage: Impleme
   return `${IMPLEMENTATION_PACKAGE_LOG_PREFIX}${JSON.stringify(implementationPackage)}`
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function asString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback
+}
+
+function asNumber(value: unknown, fallback = 1): number {
+  return typeof value === 'number' ? value : fallback
+}
+
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+}
+
+function normalizePlanPackage(value: unknown): PlanPackage | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  return {
+    version: asNumber(value.version),
+    generatedAt: asString(value.generatedAt),
+    taskId: asString(value.taskId),
+    sourceGate: asString(value.sourceGate),
+    summary: asString(value.summary),
+    objectives: asStringArray(value.objectives),
+    executionPolicy: asStringArray(value.executionPolicy),
+    implementationSteps: asStringArray(value.implementationSteps),
+    validationSteps: asStringArray(value.validationSteps),
+    rollbackSteps: asStringArray(value.rollbackSteps),
+    riskNotes: asStringArray(value.riskNotes),
+  }
+}
+
+function normalizeImplementationPackage(value: unknown): ImplementationPackage | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  return {
+    version: asNumber(value.version),
+    generatedAt: asString(value.generatedAt),
+    taskId: asString(value.taskId),
+    sourceGate: asString(value.sourceGate),
+    summary: asString(value.summary),
+    executionPolicy: asStringArray(value.executionPolicy),
+    implementationChecklist: asStringArray(value.implementationChecklist),
+    validationSteps: asStringArray(value.validationSteps),
+    mergePolicy: asStringArray(value.mergePolicy),
+    riskNotes: asStringArray(value.riskNotes),
+  }
+}
+
 export function parsePlanPackageLog(message: string): PlanPackage | null {
   if (!message.startsWith(PLAN_PACKAGE_LOG_PREFIX)) {
     return null
   }
 
   try {
-    return JSON.parse(message.slice(PLAN_PACKAGE_LOG_PREFIX.length)) as PlanPackage
+    return normalizePlanPackage(JSON.parse(message.slice(PLAN_PACKAGE_LOG_PREFIX.length)))
   } catch {
     return null
   }
@@ -158,7 +213,7 @@ export function parseImplementationPackageLog(message: string): ImplementationPa
   }
 
   try {
-    return JSON.parse(message.slice(IMPLEMENTATION_PACKAGE_LOG_PREFIX.length)) as ImplementationPackage
+    return normalizeImplementationPackage(JSON.parse(message.slice(IMPLEMENTATION_PACKAGE_LOG_PREFIX.length)))
   } catch {
     return null
   }
