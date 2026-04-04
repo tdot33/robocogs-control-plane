@@ -3,8 +3,12 @@ import { cookies } from 'next/headers'
 import { ADMIN_SESSION_COOKIE, isAdminSessionValid } from '@/lib/admin-auth'
 import { appendLog, createGateApproval, getTaskById, setTaskAgent, setTaskGate, updateTaskStatus } from '@/lib/db'
 import { areGateAnswersComplete, getApprovalTransition } from '@/lib/gates'
-import { buildPlanPackage, serializePlanPackageLog } from '@/lib/plan-package'
-import { validateTaskIssueBranchPair } from '@/lib/traceability'
+import {
+  buildImplementationPackage,
+  buildPlanPackage,
+  serializeImplementationPackageLog,
+  serializePlanPackageLog,
+} from '@/lib/plan-package'
 
 interface DecisionBody {
   decision?: 'approve' | 'reject'
@@ -48,13 +52,6 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ta
       return NextResponse.json({ error: 'All gate questions must be answered before approval' }, { status: 400 })
     }
 
-    if (gateName === 'plan-approval') {
-      const traceability = validateTaskIssueBranchPair(task.branch, task.issue_number)
-      if (traceability.status !== 'valid' && traceability.status !== 'not-required') {
-        return NextResponse.json({ error: traceability.message }, { status: 409 })
-      }
-    }
-
     const approvalAnswers: Record<string, string | boolean> = {
       ...answers,
       decision: 'approve',
@@ -84,9 +81,14 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ta
     await updateTaskStatus(taskId, transition.nextStatus, transition.nextProgress)
     await setTaskGate(taskId, transition.nextGate)
     if (gateName === 'plan-approval') {
-      const traceability = validateTaskIssueBranchPair(task.branch, task.issue_number)
+      const implementationPackage = buildImplementationPackage({
+        task,
+        answers,
+        note,
+      })
       await setTaskAgent(taskId, 'implementer')
-      await appendLog(taskId, 'traceability-guard', traceability.message)
+      await appendLog(taskId, 'implementer', 'Generated implementation handoff package for execution')
+      await appendLog(taskId, 'implementer', serializeImplementationPackageLog(implementationPackage), 'debug')
     }
     await appendLog(
       taskId,
