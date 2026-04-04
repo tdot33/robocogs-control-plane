@@ -36,7 +36,8 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
   const gateName = task.gate_current || 'manual-review'
   const gatePack = getGatePack(gateName)
   const gateTimeline = getGateTimelineState(task.gate_current, task.status)
-  const canApprove = areGateAnswersComplete(gateName, gateAnswers)
+  const isDecisionGate = Boolean(gatePack)
+  const canApprove = isDecisionGate && areGateAnswersComplete(gateName, gateAnswers)
 
   useEffect(() => {
     setIsMounted(true)
@@ -309,47 +310,64 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
 
           {/* Footer */}
           <div className="border-t border-[#30363d] bg-[#161b22] p-6">
-            <label className="mb-2 block text-xs font-semibold uppercase text-slate-400">Decision Note (optional)</label>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              className="mb-4 w-full rounded-md border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-[#c9d1d9] focus:outline-none focus:ring-2 focus:ring-[#1f6feb]"
-              rows={3}
-              placeholder="Add context for this approval or rejection"
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  if (!canApprove || isSubmitting) return
-                  void submitDecision('approve')
-                }}
-                className={`flex-1 px-4 py-2 rounded font-medium text-sm transition-colors ${
-                  canApprove && !isSubmitting
-                    ? 'border border-[#2ea043] bg-[#238636] text-white hover:bg-[#2ea043]'
-                    : 'cursor-not-allowed border border-[#30363d] bg-[#21262d] text-slate-500'
-                }`}
-                disabled={!canApprove || isSubmitting}
-              >
-                {isSubmitting ? 'Submitting...' : `Approve ${gateName}`}
-              </button>
-              <button
-                onClick={() => {
-                  if (isSubmitting) return
-                  void submitDecision('reject')
-                }}
-                className="flex-1 rounded border border-[#6e2f36] bg-[#2d1617] px-4 py-2 text-sm font-medium text-[#f85149] transition-colors hover:border-[#f85149] hover:bg-[#3d1d1f] disabled:opacity-50"
-                disabled={isSubmitting}
-              >
-                Reject
-              </button>
-              <button
-                onClick={onClose}
-                className="flex-1 rounded border border-[#30363d] bg-[#21262d] px-4 py-2 text-sm font-medium text-[#c9d1d9] transition-colors hover:border-[#8b949e] hover:bg-[#30363d] disabled:opacity-50"
-                disabled={isSubmitting}
-              >
-                Close
-              </button>
-            </div>
+            {isDecisionGate ? (
+              <>
+                <label className="mb-2 block text-xs font-semibold uppercase text-slate-400">Decision Note (optional)</label>
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  className="mb-4 w-full rounded-md border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-[#c9d1d9] focus:outline-none focus:ring-2 focus:ring-[#1f6feb]"
+                  rows={3}
+                  placeholder="Add context for this approval or rejection"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      if (!canApprove || isSubmitting) return
+                      void submitDecision('approve')
+                    }}
+                    className={`flex-1 px-4 py-2 rounded font-medium text-sm transition-colors ${
+                      canApprove && !isSubmitting
+                        ? 'border border-[#2ea043] bg-[#238636] text-white hover:bg-[#2ea043]'
+                        : 'cursor-not-allowed border border-[#30363d] bg-[#21262d] text-slate-500'
+                    }`}
+                    disabled={!canApprove || isSubmitting}
+                  >
+                    {isSubmitting ? 'Submitting...' : `Approve ${gateName}`}
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (isSubmitting) return
+                      void submitDecision('reject')
+                    }}
+                    className="flex-1 rounded border border-[#6e2f36] bg-[#2d1617] px-4 py-2 text-sm font-medium text-[#f85149] transition-colors hover:border-[#f85149] hover:bg-[#3d1d1f] disabled:opacity-50"
+                    disabled={isSubmitting}
+                  >
+                    Reject
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className="flex-1 rounded border border-[#30363d] bg-[#21262d] px-4 py-2 text-sm font-medium text-[#c9d1d9] transition-colors hover:border-[#8b949e] hover:bg-[#30363d] disabled:opacity-50"
+                    disabled={isSubmitting}
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="mb-4 rounded border border-[#1f6feb]/30 bg-[#111d2e] px-3 py-3 text-sm text-[#79c0ff]">
+                  Implementation is an execution stage. Push work to the tracked branch, attach validation evidence, and wait for merge approval to open.
+                </p>
+                <button
+                  onClick={onClose}
+                  className="w-full rounded border border-[#30363d] bg-[#21262d] px-4 py-2 text-sm font-medium text-[#c9d1d9] transition-colors hover:border-[#8b949e] hover:bg-[#30363d] disabled:opacity-50"
+                  disabled={isSubmitting}
+                >
+                  Close
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
