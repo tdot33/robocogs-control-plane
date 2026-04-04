@@ -1,0 +1,44 @@
+{
+  "gate": "plan-approval",
+  "title": "Plan Approval Gate",
+  "required": true,
+  "questions": [
+    {
+      "header": "PlanDecision",
+      "question": "Approve the plan?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "approve", "recommended": true },
+        { "label": "revise" }
+      ]
+    },
+    {
+      "header": "RoleRouting",
+      "question": "Approve role routing?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "approve", "recommended": true },
+        { "label": "adjust-roles" }
+      ]
+    },
+    {
+      "header": "Sequencing",
+      "question": "Approve package sequencing?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "approve", "recommended": true },
+        { "label": "adjust-sequencing" }
+      ]
+    },
+    {
+      "header": "StyleProfile",
+      "question": "Approve inferred style constraints?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "approve", "recommended": true },
+        { "label": "adjust-style-constraints" }
+      ]
+    }
+  ],
+  "hardBlock": "Do not start implementation until PlanDecision=approve"
+}

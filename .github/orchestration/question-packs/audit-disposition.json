@@ -1,0 +1,37 @@
+{
+  "gate": "audit-disposition",
+  "title": "Audit Disposition Gate",
+  "required": true,
+  "questions": [
+    {
+      "header": "Disposition",
+      "question": "How should audit results be handled?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "accept-pass", "recommended": true },
+        { "label": "request-remediation" },
+        { "label": "request-re-audit" }
+      ]
+    },
+    {
+      "header": "BlockingFindings",
+      "question": "Are there blocking findings?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "yes" },
+        { "label": "no", "recommended": true }
+      ]
+    },
+    {
+      "header": "RemediationOwner",
+      "question": "Who owns remediation?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "implementer", "recommended": true },
+        { "label": "domain-specialist" },
+        { "label": "both" }
+      ]
+    }
+  ],
+  "hardBlock": "If BlockingFindings=yes, do not open merge gate"
+}

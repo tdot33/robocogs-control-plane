@@ -1,0 +1,44 @@
+{
+  "gate": "merge-approval",
+  "title": "Merge Approval Gate",
+  "required": true,
+  "questions": [
+    {
+      "header": "MergeDecision",
+      "question": "Approve merge?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "approve-merge", "recommended": true },
+        { "label": "hold" }
+      ]
+    },
+    {
+      "header": "EvidenceComplete",
+      "question": "Is validation evidence complete?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "yes", "recommended": true },
+        { "label": "no" }
+      ]
+    },
+    {
+      "header": "DocsReviewed",
+      "question": "Have required docs updates been reviewed?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "yes", "recommended": true },
+        { "label": "no" }
+      ]
+    },
+    {
+      "header": "RollbackReady",
+      "question": "Are rollback notes adequate?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "yes", "recommended": true },
+        { "label": "no" }
+      ]
+    }
+  ],
+  "hardBlock": "Blocked if MergeDecision=hold OR EvidenceComplete=no OR DocsReviewed=no OR RollbackReady=no"
+}

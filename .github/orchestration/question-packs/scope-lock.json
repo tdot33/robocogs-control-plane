@@ -1,0 +1,45 @@
+{
+  "gate": "scope-lock",
+  "title": "Scope Lock Gate",
+  "required": true,
+  "questions": [
+    {
+      "header": "BoundaryMode",
+      "question": "How strict should scope boundaries be?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "strict-file-boundaries", "recommended": true },
+        { "label": "strict-module-boundaries" }
+      ]
+    },
+    {
+      "header": "ParallelSessions",
+      "question": "How many background sessions?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "1" },
+        { "label": "2" },
+        { "label": "3", "recommended": true }
+      ]
+    },
+    {
+      "header": "BranchOwnership",
+      "question": "Enforce one issue/branch per session?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "enforce", "recommended": true },
+        { "label": "allow-exception" }
+      ]
+    },
+    {
+      "header": "OverlapPolicy",
+      "question": "How should overlap be handled?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "block-overlap", "recommended": true },
+        { "label": "allow-with-resequence" }
+      ]
+    }
+  ],
+  "hardBlock": "When OverlapPolicy=block-overlap, deny launch if path overlap exists"
+}

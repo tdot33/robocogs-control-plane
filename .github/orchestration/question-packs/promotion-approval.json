@@ -1,0 +1,44 @@
+{
+  "gate": "promotion-approval",
+  "title": "Promotion Approval Gate",
+  "required": true,
+  "questions": [
+    {
+      "header": "PromotionDecision",
+      "question": "Promote to production now?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "approve-promotion", "recommended": true },
+        { "label": "hold" }
+      ]
+    },
+    {
+      "header": "CIReleaseStatus",
+      "question": "Are CI and release checks passing?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "pass", "recommended": true },
+        { "label": "fail" }
+      ]
+    },
+    {
+      "header": "RiskPosture",
+      "question": "Is current risk posture acceptable?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "acceptable", "recommended": true },
+        { "label": "unacceptable" }
+      ]
+    },
+    {
+      "header": "RollbackConfirmed",
+      "question": "Is rollback readiness confirmed?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "confirmed", "recommended": true },
+        { "label": "not-confirmed" }
+      ]
+    }
+  ],
+  "hardBlock": "Blocked if PromotionDecision=hold OR CIReleaseStatus=fail OR RiskPosture=unacceptable OR RollbackConfirmed=not-confirmed"
+}

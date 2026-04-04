@@ -1,0 +1,51 @@
+{
+  "gate": "intake",
+  "title": "Intake Gate",
+  "required": true,
+  "questions": [
+    {
+      "header": "WorkType",
+      "question": "What type of work is this?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "feature", "recommended": true },
+        { "label": "fix" },
+        { "label": "hotfix" },
+        { "label": "docs" },
+        { "label": "chore" }
+      ]
+    },
+    {
+      "header": "RiskLevel",
+      "question": "What is the risk level?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "low" },
+        { "label": "medium", "recommended": true },
+        { "label": "high" }
+      ]
+    },
+    {
+      "header": "DeliveryMode",
+      "question": "How should execution run?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "single-session" },
+        { "label": "parallel-up-to-3", "recommended": true }
+      ]
+    },
+    {
+      "header": "NeedsDomainSpecialist",
+      "question": "Should the Domain Specialist be required?",
+      "allowFreeformInput": false,
+      "options": [
+        { "label": "yes", "recommended": true },
+        { "label": "no" }
+      ]
+    }
+  ],
+  "rules": [
+    "feature|fix|hotfix requires issue-first flow",
+    "high risk increases per-gate question budget and requires strict audit"
+  ]
+}
