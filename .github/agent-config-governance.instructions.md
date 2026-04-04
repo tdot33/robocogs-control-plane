@@ -43,6 +43,8 @@ Apply these rules whenever defining or updating shared or repository-level agent
 - Respect repository workflow rules and validation gates.
 - Do not bypass issue, branch, or PR guardrails when behavior changes are planned.
 - Avoid destructive git recommendations unless explicitly approved.
+- Prefer a separate git worktree for concurrent issue-scoped sessions or when unrelated local changes must remain untouched.
+- Treat git worktrees as workspace isolation only; if scope ownership or shared contracts overlap, escalate instead of parallelizing blindly.
 
 ## Scope Control
 
