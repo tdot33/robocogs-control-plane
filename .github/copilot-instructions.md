@@ -76,8 +76,10 @@ Tasks move through gates in order: `intake → plan-approval → implementation 
 Before writing any code:
 1. Confirm the task is within the approved gate scope.
 2. Make the **smallest possible diff** — prefer targeted edits over rewrites.
-3. After any change to API routes, Inngest functions, or database helpers, run `npm run build` to confirm no TypeScript errors.
-4. Do not modify `db/migrations/001_initial.sql`. Add a new numbered migration file for schema changes.
+3. For concurrent local work, bootstrap the branch from the clean base checkout and move implementation into a dedicated git worktree rather than reusing a checkout with unrelated changes.
+4. Treat git worktrees as local isolation only; if the requested change overlaps a shared contract, gate, or migration path, escalate instead of assuming parallel work is safe.
+5. After any change to API routes, Inngest functions, or database helpers, run `npm run build` to confirm no TypeScript errors.
+6. Do not modify `db/migrations/001_initial.sql`. Add a new numbered migration file for schema changes.
 
 ## Running Locally
 
