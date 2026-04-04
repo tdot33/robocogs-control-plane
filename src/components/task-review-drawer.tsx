@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import type { TaskData } from './agent-tasks-table'
 import { areGateAnswersComplete, getGatePack, getGateTimelineState } from '@/lib/gates'
-import type { ImplementationEvidence, ImplementationPackage, PlanPackage } from '@/lib/plan-package'
+import type { AuditorReviewPackage, ImplementationEvidence, ImplementationPackage, PlanPackage } from '@/lib/plan-package'
 
 interface TaskReviewDrawerProps {
   task: TaskData
@@ -28,6 +28,7 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
   const [planPackage, setPlanPackage] = useState<PlanPackage | null>(null)
   const [implementationPackage, setImplementationPackage] = useState<ImplementationPackage | null>(null)
   const [implementationEvidence, setImplementationEvidence] = useState<ImplementationEvidence | null>(null)
+  const [auditorReviewPackage, setAuditorReviewPackage] = useState<AuditorReviewPackage | null>(null)
   const [gateAnswers, setGateAnswers] = useState<Record<string, string>>({})
   const [note, setNote] = useState('')
   const [implementationEvidenceForm, setImplementationEvidenceForm] = useState({
@@ -83,11 +84,13 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
         setPlanPackage(data.planPackage || null)
         setImplementationPackage(data.implementationPackage || null)
         setImplementationEvidence(data.implementationEvidence || null)
+        setAuditorReviewPackage(data.auditorReviewPackage || null)
       } catch (error) {
         setLogs([])
         setPlanPackage(null)
         setImplementationPackage(null)
         setImplementationEvidence(null)
+        setAuditorReviewPackage(null)
         setErrorMessage(error instanceof Error ? error.message : 'Failed to load logs')
       } finally {
         setLoading(false)
@@ -146,6 +149,7 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
 
       const payload = await response.json()
       setImplementationEvidence(payload.evidence || null)
+      setAuditorReviewPackage(payload.auditorReviewPackage || null)
       router.refresh()
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to submit implementation evidence')
@@ -299,6 +303,20 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
               </div>
             ) : null}
 
+            {auditorReviewPackage ? (
+              <div className="border-b border-[#30363d] p-6">
+                <h3 className="mb-3 font-semibold text-white">Auditor Review Package</h3>
+                <p className="text-sm text-slate-300">{auditorReviewPackage.summary}</p>
+
+                <div className="mt-4 space-y-4 text-sm text-slate-200">
+                  <PlanList title="Evidence Checklist" items={auditorReviewPackage.evidenceChecklist} />
+                  <PlanList title="Review Focus" items={auditorReviewPackage.reviewFocus} />
+                  <PlanList title="Merge Criteria" items={auditorReviewPackage.mergeCriteria} />
+                  <PlanList title="Closeout Expectations" items={auditorReviewPackage.closeoutExpectations} />
+                </div>
+              </div>
+            ) : null}
+
             {gatePack ? (
               <div className="border-b border-[#30363d] p-6">
                 <h3 className="mb-3 font-semibold text-white">Gate Questions</h3>
@@ -365,7 +383,7 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
             {gateName === 'implementation' ? (
               <>
                 <p className="mb-4 rounded border border-[#1f6feb]/30 bg-[#111d2e] px-3 py-3 text-sm text-[#79c0ff]">
-                  Submit implementation evidence here so merge approval can be opened from a structured execution package instead of relying on freeform logs alone.
+                  Submit implementation evidence here so the task can hand off to the auditor with a structured review package instead of relying on freeform logs alone.
                 </p>
                 <ImplementationEvidenceInput
                   label="PR URL (optional)"
@@ -417,6 +435,11 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
                     Close
                   </button>
                 </div>
+                {implementationEvidence ? (
+                  <p className="mt-3 text-xs text-slate-400">
+                    Evidence is recorded. The task remains in implementation until CI succeeds, then merge approval opens for founder review.
+                  </p>
+                ) : null}
               </>
             ) : isDecisionGate ? (
               <>

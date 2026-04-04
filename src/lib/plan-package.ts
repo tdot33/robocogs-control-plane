@@ -46,6 +46,20 @@ export interface ImplementationEvidence {
 
 export const IMPLEMENTATION_EVIDENCE_LOG_PREFIX = '[implementation-evidence] '
 
+export interface AuditorReviewPackage {
+  version: number
+  generatedAt: string
+  taskId: string
+  sourceGate: 'implementation'
+  summary: string
+  evidenceChecklist: string[]
+  reviewFocus: string[]
+  mergeCriteria: string[]
+  closeoutExpectations: string[]
+}
+
+export const AUDITOR_REVIEW_PACKAGE_LOG_PREFIX = '[auditor-review-package] '
+
 export function buildPlanPackage(input: {
   task: AgentTask
   answers: Record<string, string>
@@ -182,6 +196,49 @@ export function serializeImplementationEvidenceLog(implementationEvidence: Imple
   return `${IMPLEMENTATION_EVIDENCE_LOG_PREFIX}${JSON.stringify(implementationEvidence)}`
 }
 
+export function buildAuditorReviewPackage(input: {
+  task: AgentTask
+  implementationEvidence: ImplementationEvidence
+}): AuditorReviewPackage {
+  const { task, implementationEvidence } = input
+  const trackedBranch = implementationEvidence.branch || task.branch || 'the tracked work branch'
+
+  return {
+    version: 1,
+    generatedAt: new Date().toISOString(),
+    taskId: task.id,
+    sourceGate: 'implementation',
+    summary: `Auditor review package for ${task.task_name}. Review the evidence captured on ${trackedBranch} before merge approval is granted.`,
+    evidenceChecklist: [
+      implementationEvidence.prUrl
+        ? `PR prepared for review: ${implementationEvidence.prUrl}`
+        : 'PR URL was not supplied; confirm the review branch is available before merge approval.',
+      `Head SHA submitted for review: ${implementationEvidence.headSha}.`,
+      `Validation evidence captured: ${implementationEvidence.validationSummary}.`,
+      `Implemented scope summary captured: ${implementationEvidence.scopeSummary}.`,
+      `Rollback notes captured: ${implementationEvidence.rollbackNotes}.`,
+    ],
+    reviewFocus: [
+      'Confirm the submitted scope matches the approved implementation package and excludes unrelated changes.',
+      'Validate that the recorded evidence is sufficient for founder merge approval, not just local confidence.',
+      'Check branch state, PR readiness, and CI outcomes before advancing the task to merge review.',
+    ],
+    mergeCriteria: [
+      'Merge approval only opens after both CI success and implementation evidence are present.',
+      'Evidence package must remain current with the reviewed head SHA and PR state.',
+      'Escalate any scope or rollback gaps before founder merge approval is requested.',
+    ],
+    closeoutExpectations: [
+      'Keep the audit trail explicit in task logs so historian closeout is based on recorded evidence rather than inference.',
+      'Hand off to historian only after merge or final approval disposition is recorded.',
+    ],
+  }
+}
+
+export function serializeAuditorReviewPackageLog(auditorReviewPackage: AuditorReviewPackage): string {
+  return `${AUDITOR_REVIEW_PACKAGE_LOG_PREFIX}${JSON.stringify(auditorReviewPackage)}`
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
@@ -256,6 +313,24 @@ function normalizeImplementationEvidence(value: unknown): ImplementationEvidence
   }
 }
 
+function normalizeAuditorReviewPackage(value: unknown): AuditorReviewPackage | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  return {
+    version: asNumber(value.version),
+    generatedAt: asString(value.generatedAt),
+    taskId: asString(value.taskId),
+    sourceGate: 'implementation',
+    summary: asString(value.summary),
+    evidenceChecklist: asStringArray(value.evidenceChecklist),
+    reviewFocus: asStringArray(value.reviewFocus),
+    mergeCriteria: asStringArray(value.mergeCriteria),
+    closeoutExpectations: asStringArray(value.closeoutExpectations),
+  }
+}
+
 export function parsePlanPackageLog(message: string): PlanPackage | null {
   if (!message.startsWith(PLAN_PACKAGE_LOG_PREFIX)) {
     return null
@@ -287,6 +362,18 @@ export function parseImplementationEvidenceLog(message: string): ImplementationE
 
   try {
     return normalizeImplementationEvidence(JSON.parse(message.slice(IMPLEMENTATION_EVIDENCE_LOG_PREFIX.length)))
+  } catch {
+    return null
+  }
+}
+
+export function parseAuditorReviewPackageLog(message: string): AuditorReviewPackage | null {
+  if (!message.startsWith(AUDITOR_REVIEW_PACKAGE_LOG_PREFIX)) {
+    return null
+  }
+
+  try {
+    return normalizeAuditorReviewPackage(JSON.parse(message.slice(AUDITOR_REVIEW_PACKAGE_LOG_PREFIX.length)))
   } catch {
     return null
   }
