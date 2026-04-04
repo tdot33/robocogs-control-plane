@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { ADMIN_SESSION_COOKIE, isAdminSessionValid } from '@/lib/admin-auth'
-import { appendLog, getTaskById, updateTaskStatus } from '@/lib/db'
+import { inngest } from '@/inngest/client'
+import { appendLog, getTaskById, getTaskLogs, setTaskGate, updateTaskStatus } from '@/lib/db'
+import { findLatestMergeApprovalContext, getMergeApprovalReadiness } from '@/lib/merge-approval'
 import { buildImplementationEvidence, serializeImplementationEvidenceLog } from '@/lib/plan-package'
 
 interface ImplementationEvidenceBody {
@@ -55,6 +57,33 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ta
   await appendLog(taskId, 'implementer', 'Submitted implementation evidence package')
   await appendLog(taskId, 'implementer', serializeImplementationEvidenceLog(evidence), 'debug')
   await updateTaskStatus(taskId, 'running', Math.max(task.progress, 65))
+
+  const logs = await getTaskLogs(taskId)
+  const readiness = getMergeApprovalReadiness({
+    task,
+    logs,
+    ciContext: findLatestMergeApprovalContext(logs),
+  })
+
+  if (readiness.state === 'ready') {
+    await updateTaskStatus(taskId, 'awaiting_approval', 85)
+    await setTaskGate(taskId, 'merge-approval')
+    await appendLog(taskId, 'implementer', 'Implementation evidence satisfied the final merge gate prerequisite; queued merge approval')
+    await inngest.send({
+      name: 'orchestration/gate.awaiting_approval',
+      data: {
+        taskId,
+        gateName: 'merge-approval',
+        questionPackId: 'merge-approval',
+        repoOwner: readiness.ciContext.repoOwner,
+        repoName: readiness.ciContext.repoName,
+        prNumber: readiness.ciContext.prNumber || undefined,
+        installationId: readiness.ciContext.installationId,
+      },
+    })
+  } else if (readiness.state === 'waiting-for-ci') {
+    await appendLog(taskId, 'implementer', 'Implementation evidence recorded; awaiting CI success before opening merge approval')
+  }
 
   return NextResponse.json({ ok: true, taskId, evidence })
 }
