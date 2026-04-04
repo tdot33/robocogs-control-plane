@@ -95,7 +95,7 @@ export function buildPlanPackage(input: {
     sourceGate: 'intake',
     summary: `Implementation package for ${task.task_name}. ${branchContext}`,
     objectives: [
-      `Implement the requested change for \"${task.task_name}\" with the smallest viable diff.`,
+      `Implement the requested change for "${task.task_name}" with the smallest viable diff.`,
       issueContext,
       'Preserve existing production behavior outside the approved scope.',
     ],
@@ -119,8 +119,12 @@ export function buildPlanPackage(input: {
       'Restore the last known-good behavior and record the blocking reason in the orchestration task.',
     ],
     riskNotes: [
-      scopeConfirmed ? 'Scope was explicitly confirmed during intake approval.' : 'Scope confirmation was not explicit; review the branch diff carefully before implementation.',
-      riskAccepted ? 'Risk posture was accepted during intake approval.' : 'Risk posture was not fully accepted during intake approval; require extra validation before merge.',
+      scopeConfirmed
+        ? 'Scope was explicitly confirmed during intake approval.'
+        : 'Scope confirmation was not explicit; review the branch diff carefully before implementation.',
+      riskAccepted
+        ? 'Risk posture was accepted during intake approval.'
+        : 'Risk posture was not fully accepted during intake approval; require extra validation before merge.',
       note ? `Intake note: ${note}` : 'No additional intake note was provided.',
     ],
   }
@@ -167,8 +171,12 @@ export function buildImplementationPackage(input: {
       'Request merge approval only after the work branch is pushed and validation evidence is attached.',
     ],
     riskNotes: [
-      planSound ? 'Plan approval confirmed the proposed implementation shape.' : 'Plan soundness was not explicitly confirmed; validate change shape before coding.',
-      rollbackReady ? 'Rollback strategy was confirmed at plan approval.' : 'Rollback strategy was not fully confirmed; document rollback details during implementation.',
+      planSound
+        ? 'Plan approval confirmed the proposed implementation shape.'
+        : 'Plan soundness was not explicitly confirmed; validate change shape before coding.',
+      rollbackReady
+        ? 'Rollback strategy was confirmed at plan approval.'
+        : 'Rollback strategy was not fully confirmed; document rollback details during implementation.',
       note ? `Plan approval note: ${note}` : 'No additional plan approval note was provided.',
     ],
   }
@@ -313,7 +321,7 @@ function normalizePlanPackage(value: unknown): PlanPackage | null {
     version: asNumber(value.version),
     generatedAt: asString(value.generatedAt),
     taskId: asString(value.taskId),
-    sourceGate: asString(value.sourceGate),
+    sourceGate: asString(value.sourceGate, 'intake'),
     summary: asString(value.summary),
     objectives: asStringArray(value.objectives),
     executionPolicy: asStringArray(value.executionPolicy),
@@ -333,7 +341,7 @@ function normalizeImplementationPackage(value: unknown): ImplementationPackage |
     version: asNumber(value.version),
     generatedAt: asString(value.generatedAt),
     taskId: asString(value.taskId),
-    sourceGate: asString(value.sourceGate),
+    sourceGate: asString(value.sourceGate, 'plan-approval'),
     summary: asString(value.summary),
     executionPolicy: asStringArray(value.executionPolicy),
     implementationChecklist: asStringArray(value.implementationChecklist),

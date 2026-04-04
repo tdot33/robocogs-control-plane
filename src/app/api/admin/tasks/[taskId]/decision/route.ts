@@ -48,11 +48,11 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ta
       return NextResponse.json({ error: 'All gate questions must be answered before approval' }, { status: 400 })
     }
 
-    if (gateName === 'plan-approval') {
-      const traceability = validateTaskIssueBranchPair(task.branch, task.issue_number)
-      if (traceability.status !== 'valid' && traceability.status !== 'not-required') {
-        return NextResponse.json({ error: traceability.message }, { status: 409 })
-      }
+    const traceability =
+      gateName === 'plan-approval' ? validateTaskIssueBranchPair(task.branch, task.issue_number) : null
+
+    if (traceability && traceability.status !== 'valid' && traceability.status !== 'not-required') {
+      return NextResponse.json({ error: traceability.message }, { status: 409 })
     }
 
     const approvalAnswers: Record<string, string | boolean> = {
@@ -69,6 +69,10 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ta
       approvedBy: actor,
       answers: approvalAnswers,
     })
+
+    if (traceability) {
+      await appendLog(taskId, 'traceability-guard', traceability.message)
+    }
 
     await applyApprovedGateTransition({
       taskId,
