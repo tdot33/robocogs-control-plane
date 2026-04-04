@@ -1,8 +1,18 @@
 import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { appendLog, createTask, getTaskByBranch, getTaskByIssueNumber } from '@/lib/db'
+import { appendLog, createTask, getInFlightTaskByScopeSlice, getInFlightTaskCount, getTaskByBranch, getTaskByIssueNumber } from '@/lib/db'
 import { createIssueComment, getRepoInstallationId } from '@/lib/github'
 import { formatGateQuestionComment } from '@/inngest/gate-processor'
+
+const KNOWN_SCOPE_SLICES = new Set([
+  'auth-and-host-surface',
+  'invoice-processing',
+  'workflow-and-api',
+  'category-and-gl-mapping',
+  'analytics-instrumentation',
+  'docs-and-workflow',
+])
+const MAX_CONCURRENT_SESSIONS = 3
 
 interface WorkStartPayload {
   workKey?: string
@@ -10,6 +20,7 @@ interface WorkStartPayload {
   title?: string
   issueNumber?: number
   branchName?: string
+  scopeSlice?: string
   repoOwner?: string
   repoName?: string
 }
@@ -51,6 +62,7 @@ export async function POST(request: NextRequest) {
   const repoOwner = String(body.repoOwner || '').trim()
   const repoName = String(body.repoName || '').trim()
   const workKey = String(body.workKey || '').trim()
+  const scopeSlice = String(body.scopeSlice || '').trim().toLowerCase()
   const issueNumber = Number(body.issueNumber || 0)
   const taskType = String(body.type || '').trim() || 'feature'
 
@@ -58,10 +70,35 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
+  if (scopeSlice && !KNOWN_SCOPE_SLICES.has(scopeSlice)) {
+    return NextResponse.json({ error: `Unsupported scope slice: ${scopeSlice}` }, { status: 400 })
+  }
+
   const existingTask = issueNumber ? await getTaskByIssueNumber(issueNumber) : await getTaskByBranch(branchName)
   if (existingTask) {
     await appendLog(existingTask.id, 'work-start-intake', `Observed work:start handoff for branch ${branchName}`)
     return NextResponse.json({ ok: true, taskId: existingTask.id, created: false })
+  }
+
+  const inFlightTaskCount = await getInFlightTaskCount()
+  if (inFlightTaskCount >= MAX_CONCURRENT_SESSIONS) {
+    return NextResponse.json(
+      { error: `Concurrent implementation limit reached (${MAX_CONCURRENT_SESSIONS}). Finish or resequence an active session before starting another.` },
+      { status: 429 }
+    )
+  }
+
+  if (scopeSlice) {
+    const conflictingTask = await getInFlightTaskByScopeSlice(scopeSlice)
+    if (conflictingTask) {
+      return NextResponse.json(
+        {
+          error: `Scope slice ${scopeSlice} is already active on task ${conflictingTask.id}. Re-sequence the work or request explicit overlap approval.`,
+          conflictingTaskId: conflictingTask.id,
+        },
+        { status: 409 }
+      )
+    }
   }
 
   const taskId = buildTaskId({ workKey, issueNumber })
@@ -73,11 +110,12 @@ export async function POST(request: NextRequest) {
     progress: 10,
     branch: branchName,
     issue_number: issueNumber || null,
-    scope_slice: null,
+    scope_slice: scopeSlice || null,
     gate_current: 'intake',
   })
 
-  await appendLog(taskId, 'work-start-intake', `Created orchestration task from work:start (${taskType})`)
+  const scopeSuffix = scopeSlice ? `, scope ${scopeSlice}` : ''
+  await appendLog(taskId, 'work-start-intake', `Created orchestration task from work:start (${taskType}${scopeSuffix})`)
 
   if (issueNumber > 0) {
     try {

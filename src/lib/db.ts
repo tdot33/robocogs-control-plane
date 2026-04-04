@@ -89,6 +89,25 @@ export async function getTaskByBranch(branch: string): Promise<AgentTask | null>
   return (result.rows[0] as unknown as AgentTask) || null
 }
 
+export async function getInFlightTaskCount(): Promise<number> {
+  const result = await db.execute(
+    'SELECT COUNT(*) AS count FROM agent_tasks WHERE status NOT IN (?, ?, ?)',
+    ['complete', 'rejected', 'failed']
+  )
+
+  const row = result.rows[0] as { count?: number | string } | undefined
+  return Number(row?.count || 0)
+}
+
+export async function getInFlightTaskByScopeSlice(scopeSlice: string): Promise<AgentTask | null> {
+  const result = await db.execute(
+    'SELECT * FROM agent_tasks WHERE scope_slice = ? AND status NOT IN (?, ?, ?) ORDER BY created_at DESC LIMIT 1',
+    [scopeSlice, 'complete', 'rejected', 'failed']
+  )
+
+  return (result.rows[0] as unknown as AgentTask) || null
+}
+
 export async function updateTaskStatus(taskId: string, status: TaskStatus, progress?: number): Promise<void> {
   const query = progress !== undefined 
     ? 'UPDATE agent_tasks SET status = ?, progress = ?, updated_at = datetime(?) WHERE id = ?'
