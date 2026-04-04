@@ -1,6 +1,7 @@
 import { inngest } from './client'
 import { updateTaskStatus, appendLog, getTaskById, createGateApproval, setTaskGate } from '@/lib/db'
 import { createIssueComment } from '@/lib/github'
+import { GATE_QUESTION_PACKS, getApprovalTransition } from '@/lib/gates'
 
 function coerceAnswer(value: string): string | boolean {
   const normalized = value.trim().toLowerCase()
@@ -45,39 +46,6 @@ function parseGateResponse(commentBody: string):
   }
 
   return { decision, taskId, answers }
-}
-
-// Load gate question packs from robocogs repo (these would be synced)
-const GATE_QUESTION_PACKS: Record<string, { questions: Array<{ id: string; label: string; type: 'yes-no' | 'single-choice' | 'multi-choice' }> }> = {
-  'intake': {
-    questions: [
-      { id: 'scope-clear', label: 'Scope is clearly defined and achievable?', type: 'yes-no' },
-      { id: 'risk-assessed', label: 'Risk posture assessed and acceptable?', type: 'yes-no' },
-    ]
-  },
-  'plan-approval': {
-    questions: [
-      { id: 'plan-sound', label: 'Proposed implementation plan is sound?', type: 'yes-no' },
-      { id: 'testability', label: 'Plan includes testability and validation?', type: 'yes-no' },
-      { id: 'rollback-ready', label: 'Rollback strategy defined?', type: 'yes-no' },
-    ]
-  },
-  'merge-approval': {
-    questions: [
-      { id: 'merge-decision', label: 'Approve merge to chet-dev?', type: 'single-choice' },
-      { id: 'evidence-complete', label: 'Evidence package complete?', type: 'yes-no' },
-      { id: 'docs-reviewed', label: 'Docs reviewed and updated?', type: 'yes-no' },
-      { id: 'rollback-ready', label: 'Rollback procedure ready?', type: 'yes-no' },
-    ]
-  },
-  'promotion-approval': {
-    questions: [
-      { id: 'promotion-decision', label: 'Promote to master?', type: 'single-choice' },
-      { id: 'ci-release-status', label: 'CI release status?', type: 'single-choice' },
-      { id: 'risk-posture', label: 'Risk posture?', type: 'single-choice' },
-      { id: 'rollback-confirmed', label: 'Confirm rollback ready?', type: 'yes-no' },
-    ]
-  },
 }
 
 /**
@@ -167,20 +135,14 @@ export const gateProcessor = inngest.createFunction(
 
       // Step 4: Update task to approved
       await step.run('finalize-approval', async () => {
-        if (gateName === 'intake') {
-          await updateTaskStatus(taskId, 'running', 25)
-          await setTaskGate(taskId, 'implementation')
-        } else if (gateName === 'merge-approval') {
-          await updateTaskStatus(taskId, 'complete', 100)
-          await setTaskGate(taskId, 'done')
-        } else {
-          await updateTaskStatus(taskId, 'approved', 100)
-        }
+        const transition = getApprovalTransition(gateName)
+        await updateTaskStatus(taskId, transition.nextStatus, transition.nextProgress)
+        await setTaskGate(taskId, transition.nextGate)
 
         await appendLog(
           taskId,
           'gate-processor',
-          `Gate ${gateName} approved by ${approval.data.approvedBy}. Answers: ${JSON.stringify(approval.data.answers)}`
+          `Gate ${gateName} approved by ${approval.data.approvedBy}. ${transition.logMessage}. Answers: ${JSON.stringify(approval.data.answers)}`
         )
       })
 

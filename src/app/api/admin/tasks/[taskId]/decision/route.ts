@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { ADMIN_SESSION_COOKIE, isAdminSessionValid } from '@/lib/admin-auth'
-import { appendLog, getTaskById, updateTaskStatus } from '@/lib/db'
-import { inngest } from '@/inngest/client'
+import { appendLog, createGateApproval, getTaskById, setTaskGate, updateTaskStatus } from '@/lib/db'
+import { areGateAnswersComplete, getApprovalTransition } from '@/lib/gates'
 
 interface DecisionBody {
   decision?: 'approve' | 'reject'
   note?: string
+  answers?: Record<string, string>
 }
 
 export async function POST(request: NextRequest, context: { params: Promise<{ taskId: string }> }) {
@@ -36,44 +37,42 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ta
   const actor = 'admin-dashboard'
   const gateName = task.gate_current || 'manual-review'
   const note = (body.note || '').trim()
+  const answers = Object.fromEntries(
+    Object.entries(body.answers || {}).map(([key, value]) => [key, String(value || '').trim()])
+  )
 
   if (decision === 'approve') {
-    await updateTaskStatus(taskId, 'approved', 100)
-    await appendLog(taskId, actor, `Approved in dashboard for gate ${gateName}${note ? `: ${note}` : ''}`)
-
-    // Emit orchestration event when event key is configured.
-    if (process.env.INNGEST_EVENT_KEY) {
-      await inngest.send({
-        name: 'orchestration/gate.approved',
-        data: {
-          taskId,
-          gateName,
-          approvedBy: actor,
-          answers: {
-            decision: 'approve',
-            note: note || 'approved via dashboard',
-          },
-        },
-      })
+    if (!areGateAnswersComplete(gateName, answers)) {
+      return NextResponse.json({ error: 'All gate questions must be answered before approval' }, { status: 400 })
     }
+
+    const approvalAnswers: Record<string, string | boolean> = {
+      ...answers,
+      decision: 'approve',
+    }
+    if (note) {
+      approvalAnswers.note = note
+    }
+
+    await createGateApproval({
+      taskId,
+      gateName,
+      approvedBy: actor,
+      answers: approvalAnswers,
+    })
+
+    const transition = getApprovalTransition(gateName)
+    await updateTaskStatus(taskId, transition.nextStatus, transition.nextProgress)
+    await setTaskGate(taskId, transition.nextGate)
+    await appendLog(
+      taskId,
+      actor,
+      `Approved ${gateName} in dashboard. ${transition.logMessage}${note ? `: ${note}` : ''}`
+    )
   } else {
     await updateTaskStatus(taskId, 'rejected', 0)
+    await setTaskGate(taskId, gateName)
     await appendLog(taskId, actor, `Rejected in dashboard for gate ${gateName}${note ? `: ${note}` : ''}`, 'warn')
-
-    if (process.env.INNGEST_EVENT_KEY) {
-      await inngest.send({
-        name: 'orchestration/gate.hard_blocked',
-        data: {
-          taskId,
-          gateName,
-          blockedBy: actor,
-          blockReason: note || 'rejected via dashboard',
-          blockedAnswers: {
-            decision: 'reject',
-          },
-        },
-      })
-    }
   }
 
   return NextResponse.json({ ok: true, taskId, decision })

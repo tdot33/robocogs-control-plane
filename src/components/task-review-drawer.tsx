@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { TaskData } from './agent-tasks-table'
+import { areGateAnswersComplete, getGatePack, getGateTimelineState } from '@/lib/gates'
 
 interface TaskReviewDrawerProps {
   task: TaskData
@@ -22,19 +23,26 @@ interface AgentLog {
 export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProps) {
   const router = useRouter()
   const [logs, setLogs] = useState<AgentLog[]>([])
-  const [isApproved, setIsApproved] = useState(false)
+  const [gateAnswers, setGateAnswers] = useState<Record<string, string>>({})
   const [note, setNote] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [loading, setLoading] = useState(true)
+  const gateName = task.gate_current || 'manual-review'
+  const gatePack = getGatePack(gateName)
+  const gateTimeline = getGateTimelineState(task.gate_current, task.status)
+  const canApprove = areGateAnswersComplete(gateName, gateAnswers)
 
   useEffect(() => {
     if (!isOpen) return
 
+    setGateAnswers({})
+    setNote('')
+    setErrorMessage('')
+
     const fetchLogs = async () => {
       try {
         setLoading(true)
-        setErrorMessage('')
         const response = await fetch(`/api/admin/tasks/${task.id}/logs`, {
           cache: 'no-store',
         })
@@ -66,6 +74,7 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
         body: JSON.stringify({
           decision,
           note,
+          answers: gateAnswers,
         }),
       })
 
@@ -88,6 +97,19 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
     warn: 'text-amber-700 bg-amber-50',
     error: 'text-red-700 bg-red-50',
     debug: 'text-gray-600 bg-gray-50',
+  }
+
+  const gateBadgeLabels: Record<string, string> = {
+    intake: 'Intake',
+    'plan-approval': 'Plan Approval',
+    implementation: 'Implementation',
+    'merge-approval': 'Merge Approval',
+  }
+
+  const gateStateStyles: Record<string, string> = {
+    complete: 'bg-green-500',
+    active: 'bg-amber-500',
+    blocked: 'bg-slate-300',
   }
 
   return (
@@ -133,6 +155,10 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
                   <p className="font-medium text-slate-900 mt-1">{task.status}</p>
                 </div>
               </div>
+              <div className="mt-4">
+                <p className="text-xs font-semibold text-slate-600 uppercase">Current Gate</p>
+                <p className="font-medium text-slate-900 mt-1">{gateName}</p>
+              </div>
               {task.branch && (
                 <div className="mt-4">
                   <p className="text-xs font-semibold text-slate-600 uppercase">Branch</p>
@@ -145,20 +171,57 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
             <div className="p-6 border-b border-slate-200">
               <h3 className="font-semibold text-slate-900 mb-3">Gate Status</h3>
               <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-green-500" />
-                  <span className="text-sm text-slate-700">Intake: ✓ Passing</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-amber-500" />
-                  <span className="text-sm text-slate-700">Plan Approval: ⏳ Pending</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-slate-300" />
-                  <span className="text-sm text-slate-500">Merge Approval: — Blocked</span>
-                </div>
+                {Object.entries(gateBadgeLabels).map(([gateKey, label]) => {
+                  const gateState = gateTimeline[gateKey]
+                  const suffix = gateState === 'complete' ? '✓ Complete' : gateState === 'active' ? '⏳ Active' : '— Blocked'
+
+                  return (
+                    <div key={gateKey} className="flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded-full ${gateStateStyles[gateState]}`} />
+                      <span className={`text-sm ${gateState === 'blocked' ? 'text-slate-500' : 'text-slate-700'}`}>
+                        {label}: {suffix}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
             </div>
+
+            {gatePack ? (
+              <div className="p-6 border-b border-slate-200">
+                <h3 className="font-semibold text-slate-900 mb-3">Gate Questions</h3>
+                <div className="space-y-4">
+                  {gatePack.questions.map((question) => (
+                    <div key={question.id}>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">{question.label}</label>
+                      <select
+                        value={gateAnswers[question.id] || ''}
+                        onChange={(event) => {
+                          setGateAnswers((current) => ({
+                            ...current,
+                            [question.id]: event.target.value,
+                          }))
+                        }}
+                        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                      >
+                        <option value="">Select an answer</option>
+                        {question.type === 'yes-no' ? (
+                          <>
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="go">Go</option>
+                            <option value="hold">Hold</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             {/* Logs */}
             <div className="p-6">
@@ -195,29 +258,20 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
               rows={3}
               placeholder="Add context for this approval or rejection"
             />
-            <label className="flex items-center gap-3 cursor-pointer mb-4">
-              <input
-                type="checkbox"
-                checked={isApproved}
-                onChange={(e) => setIsApproved(e.target.checked)}
-                className="w-4 h-4 rounded border-slate-300"
-              />
-              <span className="text-sm font-medium text-slate-900">Approve Implementation</span>
-            </label>
             <div className="flex gap-2">
               <button
                 onClick={() => {
-                  if (!isApproved || isSubmitting) return
+                  if (!canApprove || isSubmitting) return
                   void submitDecision('approve')
                 }}
                 className={`flex-1 px-4 py-2 rounded font-medium text-sm transition-colors ${
-                  isApproved && !isSubmitting
+                  canApprove && !isSubmitting
                     ? 'bg-green-600 hover:bg-green-700 text-white'
                     : 'bg-slate-200 text-slate-700 cursor-not-allowed'
                 }`}
-                disabled={!isApproved || isSubmitting}
+                disabled={!canApprove || isSubmitting}
               >
-                {isSubmitting ? 'Submitting...' : 'Approve'}
+                {isSubmitting ? 'Submitting...' : `Approve ${gateName}`}
               </button>
               <button
                 onClick={() => {
