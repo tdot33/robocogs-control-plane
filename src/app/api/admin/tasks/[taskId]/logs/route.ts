@@ -3,6 +3,27 @@ import { cookies } from 'next/headers'
 import { ADMIN_SESSION_COOKIE, isAdminSessionValid } from '@/lib/admin-auth'
 import { getTaskLogs } from '@/lib/db'
 
+function filterSupersededLogs(logs: Array<{ message: string; created_at: string }>) {
+  const latestIntakeCommentSuccess = logs
+    .filter((log) => log.message.startsWith('Posted intake gate comment:'))
+    .map((log) => Date.parse(log.created_at))
+    .filter((timestamp) => Number.isFinite(timestamp))
+    .sort((left, right) => right - left)[0]
+
+  if (!latestIntakeCommentSuccess) {
+    return logs
+  }
+
+  return logs.filter((log) => {
+    if (!log.message.startsWith('Failed to post intake gate comment:')) {
+      return true
+    }
+
+    const createdAt = Date.parse(log.created_at)
+    return !Number.isFinite(createdAt) || createdAt > latestIntakeCommentSuccess
+  })
+}
+
 export async function GET(_request: NextRequest, context: { params: Promise<{ taskId: string }> }) {
   const cookieStore = await cookies()
   const sessionCookie = cookieStore.get(ADMIN_SESSION_COOKIE)?.value
@@ -17,5 +38,5 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ ta
   }
 
   const logs = await getTaskLogs(taskId)
-  return NextResponse.json({ logs })
+  return NextResponse.json({ logs: filterSupersededLogs(logs as Array<{ message: string; created_at: string }>) })
 }
