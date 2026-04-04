@@ -23,20 +23,20 @@ export default async function OrchestrationPage() {
   const tasksData = (tasks.rows || []) as any[]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 px-4 py-8">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.12),_transparent_28%),linear-gradient(180deg,#020617_0%,#0f172a_55%,#111827_100%)] px-4 py-8 text-slate-100">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8 flex items-start justify-between gap-4">
           <div>
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">Orchestration Control Surface</h1>
-          <p className="text-lg text-slate-600">
+          <h1 className="mb-2 text-4xl font-bold text-white">Orchestration Control Surface</h1>
+          <p className="text-lg text-slate-300">
             Agent task execution, gate approvals, and audit evidence
           </p>
           </div>
           <form method="POST" action="/api/admin/logout">
             <button
               type="submit"
-              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="rounded-md border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm font-medium text-slate-100 shadow-[0_0_0_1px_rgba(255,255,255,0.04)] hover:bg-slate-800"
             >
               Sign Out
             </button>
@@ -60,9 +60,9 @@ export default async function OrchestrationPage() {
         </div>
 
         {/* Main Table */}
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200">
-            <h2 className="text-xl font-semibold text-slate-900">Active Tasks</h2>
+        <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/75 shadow-[0_24px_80px_rgba(2,6,23,0.45)] backdrop-blur">
+          <div className="border-b border-slate-800 px-6 py-4">
+            <h2 className="text-xl font-semibold text-white">Active Tasks</h2>
           </div>
           <AgentTasksTable tasks={tasksData} />
         </div>
@@ -73,15 +73,15 @@ export default async function OrchestrationPage() {
 
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
   const colors = {
-    blue: 'bg-blue-50 border-blue-200 text-blue-900',
-    amber: 'bg-amber-50 border-amber-200 text-amber-900',
-    green: 'bg-green-50 border-green-200 text-green-900',
-    red: 'bg-red-50 border-red-200 text-red-900',
+    blue: 'border-sky-500/30 bg-sky-500/10 text-sky-100',
+    amber: 'border-amber-500/30 bg-amber-500/10 text-amber-100',
+    green: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100',
+    red: 'border-rose-500/30 bg-rose-500/10 text-rose-100',
   }
 
   return (
-    <div className={`${colors[color as keyof typeof colors]} border rounded-lg p-4`}>
-      <p className="text-sm font-medium opacity-75">{label}</p>
+    <div className={`${colors[color as keyof typeof colors]} rounded-2xl border p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]`}>
+      <p className="text-sm font-medium opacity-80">{label}</p>
       <p className="text-3xl font-bold mt-1">{value}</p>
     </div>
   )

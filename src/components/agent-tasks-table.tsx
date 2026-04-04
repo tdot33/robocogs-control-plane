@@ -21,13 +21,13 @@ interface AgentTasksTableProps {
 }
 
 const statusColors: Record<string, { bg: string; text: string; badge: string }> = {
-  pending: { bg: 'bg-slate-50', text: 'text-slate-700', badge: 'bg-slate-200 text-slate-800' },
-  running: { bg: 'bg-blue-50', text: 'text-blue-700', badge: 'bg-blue-200 text-blue-800' },
-  awaiting_approval: { bg: 'bg-amber-50', text: 'text-amber-700', badge: 'bg-amber-200 text-amber-800' },
-  approved: { bg: 'bg-green-50', text: 'text-green-700', badge: 'bg-green-200 text-green-800' },
-  rejected: { bg: 'bg-red-50', text: 'text-red-700', badge: 'bg-red-200 text-red-800' },
-  failed: { bg: 'bg-red-50', text: 'text-red-700', badge: 'bg-red-200 text-red-800' },
-  complete: { bg: 'bg-emerald-50', text: 'text-emerald-700', badge: 'bg-emerald-200 text-emerald-800' },
+  pending: { bg: 'bg-slate-950/60', text: 'text-slate-200', badge: 'bg-slate-800 text-slate-200' },
+  running: { bg: 'bg-sky-950/50', text: 'text-sky-100', badge: 'bg-sky-500/15 text-sky-100 ring-1 ring-sky-500/30' },
+  awaiting_approval: { bg: 'bg-amber-950/40', text: 'text-amber-100', badge: 'bg-amber-500/15 text-amber-100 ring-1 ring-amber-500/30' },
+  approved: { bg: 'bg-emerald-950/40', text: 'text-emerald-100', badge: 'bg-emerald-500/15 text-emerald-100 ring-1 ring-emerald-500/30' },
+  rejected: { bg: 'bg-rose-950/40', text: 'text-rose-100', badge: 'bg-rose-500/15 text-rose-100 ring-1 ring-rose-500/30' },
+  failed: { bg: 'bg-rose-950/40', text: 'text-rose-100', badge: 'bg-rose-500/15 text-rose-100 ring-1 ring-rose-500/30' },
+  complete: { bg: 'bg-emerald-950/30', text: 'text-emerald-100', badge: 'bg-emerald-500/15 text-emerald-100 ring-1 ring-emerald-500/30' },
 }
 
 export function AgentTasksTable({ tasks }: AgentTasksTableProps) {
@@ -42,41 +42,41 @@ export function AgentTasksTable({ tasks }: AgentTasksTableProps) {
   return (
     <>
       {/* Desktop Table */}
-      <div className="hidden md:block overflow-x-auto">
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200">
+          <thead className="border-b border-slate-800 bg-slate-950/90">
             <tr>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700">Task ID</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700">Task Name</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700">Agent</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700">Progress</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700">Branch</th>
-              <th className="px-4 py-3 text-center font-semibold text-slate-700">Action</th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-300">Task ID</th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-300">Task Name</th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-300">Agent</th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-300">Status</th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-300">Progress</th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-300">Branch</th>
+              <th className="px-4 py-3 text-center font-semibold text-slate-300">Action</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200">
+          <tbody className="divide-y divide-slate-800">
             {tasks.map((task) => (
-              <tr key={task.id} className={`${statusColors[task.status].bg} hover:bg-slate-100 transition-colors`}>
-                <td className="px-4 py-3 text-xs font-mono text-slate-600">{task.id.slice(0, 8)}...</td>
-                <td className="px-4 py-3 font-medium text-slate-900">{task.task_name}</td>
-                <td className="px-4 py-3 text-slate-700">{task.assigned_agent}</td>
+              <tr key={task.id} className={`${statusColors[task.status].bg} transition-colors hover:bg-slate-900`}>
+                <td className="px-4 py-3 text-xs font-mono text-slate-400">{task.id.slice(0, 8)}...</td>
+                <td className="px-4 py-3 font-medium text-white">{task.task_name}</td>
+                <td className={`px-4 py-3 ${statusColors[task.status].text}`}>{task.assigned_agent}</td>
                 <td className="px-4 py-3">
                   <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${statusColors[task.status].badge}`}>
                     {task.status.replace(/_/g, ' ')}
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <div className="w-full bg-slate-200 rounded-full h-2">
-                    <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${task.progress}%` }} />
+                  <div className="h-2 w-full rounded-full bg-slate-800">
+                    <div className="h-2 rounded-full bg-cyan-400" style={{ width: `${task.progress}%` }} />
                   </div>
-                  <span className="text-xs text-slate-600 mt-1 block">{task.progress}%</span>
+                  <span className="mt-1 block text-xs text-slate-400">{task.progress}%</span>
                 </td>
-                <td className="px-4 py-3 text-slate-600">{task.branch || '-'}</td>
+                <td className="px-4 py-3 text-slate-400">{task.branch || '-'}</td>
                 <td className="px-4 py-3 text-center">
                   <button
                     onClick={() => openReview(task)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
+                    className="rounded bg-cyan-500 px-3 py-1 text-xs font-medium text-slate-950 transition-colors hover:bg-cyan-400"
                   >
                     Review
                   </button>
@@ -88,13 +88,13 @@ export function AgentTasksTable({ tasks }: AgentTasksTableProps) {
       </div>
 
       {/* Mobile Card View */}
-      <div className="md:hidden space-y-3 p-4">
+      <div className="space-y-3 p-4 md:hidden">
         {tasks.map((task) => (
-          <div key={task.id} className={`${statusColors[task.status].bg} rounded-lg p-4 border border-slate-200`}>
+          <div key={task.id} className={`${statusColors[task.status].bg} rounded-xl border border-slate-800 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]`}>
             <div className="flex justify-between items-start mb-2">
               <div>
-                <h3 className="font-semibold text-slate-900">{task.task_name}</h3>
-                <p className="text-xs text-slate-600 font-mono mt-1">{task.id.slice(0, 12)}...</p>
+                <h3 className="font-semibold text-white">{task.task_name}</h3>
+                <p className="mt-1 font-mono text-xs text-slate-400">{task.id.slice(0, 12)}...</p>
               </div>
               <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${statusColors[task.status].badge}`}>
                 {task.status.replace(/_/g, ' ')}
@@ -102,24 +102,24 @@ export function AgentTasksTable({ tasks }: AgentTasksTableProps) {
             </div>
             <div className="grid grid-cols-2 gap-2 text-sm mb-3">
               <div>
-                <p className="text-xs text-slate-600">Agent</p>
-                <p className="font-medium text-slate-900">{task.assigned_agent}</p>
+                <p className="text-xs text-slate-400">Agent</p>
+                <p className="font-medium text-white">{task.assigned_agent}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-600">Branch</p>
-                <p className="font-medium text-slate-900">{task.branch || '-'}</p>
+                <p className="text-xs text-slate-400">Branch</p>
+                <p className="font-medium text-white">{task.branch || '-'}</p>
               </div>
             </div>
             <div className="mb-3">
-              <p className="text-xs text-slate-600 mb-1">Progress</p>
-              <div className="w-full bg-slate-300 rounded-full h-2">
-                <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${task.progress}%` }} />
+              <p className="mb-1 text-xs text-slate-400">Progress</p>
+              <div className="h-2 w-full rounded-full bg-slate-800">
+                <div className="h-2 rounded-full bg-cyan-400" style={{ width: `${task.progress}%` }} />
               </div>
-              <p className="text-xs text-slate-600 mt-1">{task.progress}%</p>
+              <p className="mt-1 text-xs text-slate-400">{task.progress}%</p>
             </div>
             <button
               onClick={() => openReview(task)}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm font-medium transition-colors"
+              className="w-full rounded bg-cyan-500 px-3 py-2 text-sm font-medium text-slate-950 transition-colors hover:bg-cyan-400"
             >
               Review Implementation
             </button>

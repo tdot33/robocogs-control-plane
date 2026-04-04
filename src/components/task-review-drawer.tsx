@@ -93,10 +93,10 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
   }
 
   const logLevelColors: Record<string, string> = {
-    info: 'text-slate-600 bg-slate-50',
-    warn: 'text-amber-700 bg-amber-50',
-    error: 'text-red-700 bg-red-50',
-    debug: 'text-gray-600 bg-gray-50',
+    info: 'bg-slate-900 text-slate-200 ring-1 ring-slate-800',
+    warn: 'bg-amber-500/10 text-amber-100 ring-1 ring-amber-500/20',
+    error: 'bg-rose-500/10 text-rose-100 ring-1 ring-rose-500/20',
+    debug: 'bg-sky-500/10 text-sky-100 ring-1 ring-sky-500/20',
   }
 
   const gateBadgeLabels: Record<string, string> = {
@@ -116,23 +116,23 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
     <>
       {/* Overlay */}
       {isOpen && (
-        <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
+        <div className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-[2px]" onClick={onClose} />
       )}
 
       {/* Drawer */}
       <div
-        className={`fixed right-0 top-0 h-full w-full md:w-96 bg-white shadow-2xl transform transition-transform duration-300 ease-out z-50 ${
+        className={`fixed right-0 top-0 z-50 h-full w-full bg-slate-950 shadow-2xl shadow-black/40 transition-transform duration-300 ease-out md:w-96 ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         <div className="h-full flex flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-slate-200">
+          <div className="flex items-center justify-between border-b border-slate-800 p-6">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Review</h2>
-              <p className="text-xs text-slate-600 font-mono mt-1">{task.id.slice(0, 12)}...</p>
+              <h2 className="text-lg font-bold text-white">Review</h2>
+              <p className="mt-1 font-mono text-xs text-slate-400">{task.id.slice(0, 12)}...</p>
             </div>
-            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl">
+            <button onClick={onClose} className="text-2xl text-slate-500 hover:text-slate-200">
               ✕
             </button>
           </div>
@@ -140,36 +140,36 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
           {/* Content */}
           <div className="flex-1 overflow-y-auto">
             {/* Task Info */}
-            <div className="p-6 border-b border-slate-200">
+            <div className="border-b border-slate-800 p-6">
               <div className="mb-4">
-                <p className="text-xs font-semibold text-slate-600 uppercase">Task</p>
-                <p className="font-medium text-slate-900 mt-1">{task.task_name}</p>
+                <p className="text-xs font-semibold uppercase text-slate-400">Task</p>
+                <p className="mt-1 font-medium text-white">{task.task_name}</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs font-semibold text-slate-600 uppercase">Agent</p>
-                  <p className="font-medium text-slate-900 mt-1">{task.assigned_agent}</p>
+                  <p className="text-xs font-semibold uppercase text-slate-400">Agent</p>
+                  <p className="mt-1 font-medium text-white">{task.assigned_agent}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-slate-600 uppercase">Status</p>
-                  <p className="font-medium text-slate-900 mt-1">{task.status}</p>
+                  <p className="text-xs font-semibold uppercase text-slate-400">Status</p>
+                  <p className="mt-1 font-medium text-white">{task.status}</p>
                 </div>
               </div>
               <div className="mt-4">
-                <p className="text-xs font-semibold text-slate-600 uppercase">Current Gate</p>
-                <p className="font-medium text-slate-900 mt-1">{gateName}</p>
+                <p className="text-xs font-semibold uppercase text-slate-400">Current Gate</p>
+                <p className="mt-1 font-medium text-white">{gateName}</p>
               </div>
               {task.branch && (
                 <div className="mt-4">
-                  <p className="text-xs font-semibold text-slate-600 uppercase">Branch</p>
-                  <p className="font-mono text-sm text-slate-700 mt-1 bg-slate-50 p-2 rounded">{task.branch}</p>
+                  <p className="text-xs font-semibold uppercase text-slate-400">Branch</p>
+                  <p className="mt-1 rounded bg-slate-900 p-2 font-mono text-sm text-slate-200 ring-1 ring-slate-800">{task.branch}</p>
                 </div>
               )}
             </div>
 
             {/* Gate Status */}
-            <div className="p-6 border-b border-slate-200">
-              <h3 className="font-semibold text-slate-900 mb-3">Gate Status</h3>
+            <div className="border-b border-slate-800 p-6">
+              <h3 className="mb-3 font-semibold text-white">Gate Status</h3>
               <div className="space-y-2">
                 {Object.entries(gateBadgeLabels).map(([gateKey, label]) => {
                   const gateState = gateTimeline[gateKey]
@@ -178,7 +178,7 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
                   return (
                     <div key={gateKey} className="flex items-center gap-2">
                       <div className={`w-3 h-3 rounded-full ${gateStateStyles[gateState]}`} />
-                      <span className={`text-sm ${gateState === 'blocked' ? 'text-slate-500' : 'text-slate-700'}`}>
+                      <span className={`text-sm ${gateState === 'blocked' ? 'text-slate-500' : 'text-slate-200'}`}>
                         {label}: {suffix}
                       </span>
                     </div>
@@ -188,12 +188,12 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
             </div>
 
             {gatePack ? (
-              <div className="p-6 border-b border-slate-200">
-                <h3 className="font-semibold text-slate-900 mb-3">Gate Questions</h3>
+              <div className="border-b border-slate-800 p-6">
+                <h3 className="mb-3 font-semibold text-white">Gate Questions</h3>
                 <div className="space-y-4">
                   {gatePack.questions.map((question) => (
                     <div key={question.id}>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">{question.label}</label>
+                      <label className="mb-1 block text-sm font-medium text-slate-200">{question.label}</label>
                       <select
                         value={gateAnswers[question.id] || ''}
                         onChange={(event) => {
@@ -202,7 +202,7 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
                             [question.id]: event.target.value,
                           }))
                         }}
-                        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                        className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-400"
                       >
                         <option value="">Select an answer</option>
                         {question.type === 'yes-no' ? (
@@ -225,17 +225,17 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
 
             {/* Logs */}
             <div className="p-6">
-              <h3 className="font-semibold text-slate-900 mb-3">Activity Logs</h3>
+              <h3 className="mb-3 font-semibold text-white">Activity Logs</h3>
               {errorMessage ? (
-                <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                <div className="mb-3 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">
                   {errorMessage}
                 </div>
               ) : null}
               <div className="space-y-2 max-h-48 overflow-y-auto">
                 {loading ? (
-                  <p className="text-sm text-slate-600">Loading logs...</p>
+                  <p className="text-sm text-slate-400">Loading logs...</p>
                 ) : logs.length === 0 ? (
-                  <p className="text-sm text-slate-600 italic">No logs yet</p>
+                  <p className="text-sm italic text-slate-400">No logs yet</p>
                 ) : (
                   logs.map((log) => (
                     <div key={log.id} className={`text-xs p-2 rounded ${logLevelColors[log.level]}`}>
@@ -249,12 +249,12 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
           </div>
 
           {/* Footer */}
-          <div className="border-t border-slate-200 p-6 bg-slate-50">
-            <label className="block text-xs font-semibold text-slate-600 uppercase mb-2">Decision Note (optional)</label>
+          <div className="border-t border-slate-800 bg-slate-950 p-6">
+            <label className="mb-2 block text-xs font-semibold uppercase text-slate-400">Decision Note (optional)</label>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              className="mb-4 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500"
+              className="mb-4 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-400"
               rows={3}
               placeholder="Add context for this approval or rejection"
             />
@@ -266,8 +266,8 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
                 }}
                 className={`flex-1 px-4 py-2 rounded font-medium text-sm transition-colors ${
                   canApprove && !isSubmitting
-                    ? 'bg-green-600 hover:bg-green-700 text-white'
-                    : 'bg-slate-200 text-slate-700 cursor-not-allowed'
+                    ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
+                    : 'cursor-not-allowed bg-slate-800 text-slate-500'
                 }`}
                 disabled={!canApprove || isSubmitting}
               >
@@ -278,14 +278,14 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
                   if (isSubmitting) return
                   void submitDecision('reject')
                 }}
-                className="flex-1 px-4 py-2 rounded font-medium text-sm bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50"
+                className="flex-1 rounded bg-rose-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-rose-400 disabled:opacity-50"
                 disabled={isSubmitting}
               >
                 Reject
               </button>
               <button
                 onClick={onClose}
-                className="flex-1 px-4 py-2 rounded font-medium text-sm bg-slate-200 hover:bg-slate-300 text-slate-900 transition-colors disabled:opacity-50"
+                className="flex-1 rounded bg-slate-800 px-4 py-2 text-sm font-medium text-slate-100 transition-colors hover:bg-slate-700 disabled:opacity-50"
                 disabled={isSubmitting}
               >
                 Close
