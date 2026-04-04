@@ -6,6 +6,7 @@ const WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET
 const WEBHOOK_FORWARD_URL = process.env.WEBHOOK_FORWARD_URL
 const WEBHOOK_FORWARD_AUTH_MODE = (process.env.WEBHOOK_FORWARD_AUTH_MODE || 'none').toLowerCase()
 const WEBHOOK_FORWARD_AUDIENCE = process.env.WEBHOOK_FORWARD_AUDIENCE
+const ORCHESTRATION_LABEL = 'orchestration'
 
 if (!WEBHOOK_SECRET) {
   console.error('GITHUB_WEBHOOK_SECRET is not set!')
@@ -128,6 +129,14 @@ export async function POST(request: NextRequest) {
     const repoOwner = repository?.owner?.login || ''
     const repoName = repository?.name || ''
 
+    console.log('GitHub webhook received', {
+      eventType,
+      action,
+      repo: repository?.full_name || '',
+      installationId,
+      deliveryId: request.headers.get('x-github-delivery') || '',
+    })
+
     // Route based on event type
     if (eventType === 'check_suite' && check_suite) {
       const { status, conclusion } = check_suite
@@ -152,7 +161,11 @@ export async function POST(request: NextRequest) {
 
     if (eventType === 'pull_request' && pull_request) {
       const { action: prAction } = payload
-      if (prAction === 'labeled' && payload.label?.name === 'orchestration') {
+      const labelNames = Array.isArray(pull_request.labels) ? pull_request.labels.map((label: { name?: string }) => label.name).filter(Boolean) : []
+      const hasOrchestrationLabel = payload.label?.name === ORCHESTRATION_LABEL || labelNames.includes(ORCHESTRATION_LABEL)
+      const shouldTriggerOrchestration = hasOrchestrationLabel && ['labeled', 'opened', 'reopened', 'synchronize', 'ready_for_review'].includes(prAction)
+
+      if (shouldTriggerOrchestration) {
         await inngest.send({
           name: 'orchestration/pr.labeled',
           data: {
@@ -162,7 +175,7 @@ export async function POST(request: NextRequest) {
             owner: repoOwner,
             repoName,
             title: pull_request.title,
-            label: payload.label.name,
+            label: ORCHESTRATION_LABEL,
             installationId,
           },
         })
