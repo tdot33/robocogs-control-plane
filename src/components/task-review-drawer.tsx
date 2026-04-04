@@ -5,8 +5,7 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import type { TaskData } from './agent-tasks-table'
 import { areGateAnswersComplete, getGatePack, getGateTimelineState } from '@/lib/gates'
-import type { PlanPackage } from '@/lib/plan-package'
-import { validateTaskIssueBranchPair } from '@/lib/traceability'
+import type { ImplementationPackage, PlanPackage } from '@/lib/plan-package'
 
 interface TaskReviewDrawerProps {
   task: TaskData
@@ -27,6 +26,7 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
   const router = useRouter()
   const [logs, setLogs] = useState<AgentLog[]>([])
   const [planPackage, setPlanPackage] = useState<PlanPackage | null>(null)
+  const [implementationPackage, setImplementationPackage] = useState<ImplementationPackage | null>(null)
   const [gateAnswers, setGateAnswers] = useState<Record<string, string>>({})
   const [note, setNote] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -36,9 +36,8 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
   const gateName = task.gate_current || 'manual-review'
   const gatePack = getGatePack(gateName)
   const gateTimeline = getGateTimelineState(task.gate_current, task.status)
-  const traceability = validateTaskIssueBranchPair(task.branch, task.issue_number)
-  const traceabilityBlocksApproval = gateName === 'plan-approval' && !['valid', 'not-required'].includes(traceability.status)
-  const canApprove = areGateAnswersComplete(gateName, gateAnswers) && !traceabilityBlocksApproval
+  const isDecisionGate = Boolean(gatePack)
+  const canApprove = isDecisionGate && areGateAnswersComplete(gateName, gateAnswers)
 
   useEffect(() => {
     setIsMounted(true)
@@ -67,9 +66,11 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
         const data = await response.json()
         setLogs(Array.isArray(data.logs) ? data.logs : [])
         setPlanPackage(data.planPackage || null)
+        setImplementationPackage(data.implementationPackage || null)
       } catch (error) {
         setLogs([])
         setPlanPackage(null)
+        setImplementationPackage(null)
         setErrorMessage(error instanceof Error ? error.message : 'Failed to load logs')
       } finally {
         setLoading(false)
@@ -208,18 +209,10 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
               </div>
             </div>
 
-            {gateName === 'plan-approval' ? (
+            {planPackage?.executionPolicy?.length ? (
               <div className="border-b border-[#30363d] p-6">
-                <h3 className="mb-3 font-semibold text-white">Traceability Guard</h3>
-                <div
-                  className={`rounded border px-3 py-3 text-sm ${
-                    traceability.status === 'valid' || traceability.status === 'not-required'
-                      ? 'border-[#1f5132] bg-[#12261e] text-[#3fb950]'
-                      : 'border-[#6e2f36] bg-[#2d1617] text-[#f85149]'
-                  }`}
-                >
-                  <p>{traceability.message}</p>
-                </div>
+                <h3 className="mb-3 font-semibold text-white">Execution Policy</h3>
+                <PlanList title="Branch And Merge Policy" items={planPackage.executionPolicy} />
               </div>
             ) : null}
 
@@ -230,10 +223,26 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
 
                 <div className="mt-4 space-y-4 text-sm text-slate-200">
                   <PlanList title="Objectives" items={planPackage.objectives} />
+                  <PlanList title="Execution Policy" items={planPackage.executionPolicy} />
                   <PlanList title="Implementation" items={planPackage.implementationSteps} />
                   <PlanList title="Validation" items={planPackage.validationSteps} />
                   <PlanList title="Rollback" items={planPackage.rollbackSteps} />
                   <PlanList title="Risk Notes" items={planPackage.riskNotes} />
+                </div>
+              </div>
+            ) : null}
+
+            {implementationPackage ? (
+              <div className="border-b border-[#30363d] p-6">
+                <h3 className="mb-3 font-semibold text-white">Implementation Handoff</h3>
+                <p className="text-sm text-slate-300">{implementationPackage.summary}</p>
+
+                <div className="mt-4 space-y-4 text-sm text-slate-200">
+                  <PlanList title="Execution Policy" items={implementationPackage.executionPolicy} />
+                  <PlanList title="Checklist" items={implementationPackage.implementationChecklist} />
+                  <PlanList title="Validation" items={implementationPackage.validationSteps} />
+                  <PlanList title="Merge Policy" items={implementationPackage.mergePolicy} />
+                  <PlanList title="Risk Notes" items={implementationPackage.riskNotes} />
                 </div>
               </div>
             ) : null}
@@ -301,47 +310,64 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
 
           {/* Footer */}
           <div className="border-t border-[#30363d] bg-[#161b22] p-6">
-            <label className="mb-2 block text-xs font-semibold uppercase text-slate-400">Decision Note (optional)</label>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              className="mb-4 w-full rounded-md border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-[#c9d1d9] focus:outline-none focus:ring-2 focus:ring-[#1f6feb]"
-              rows={3}
-              placeholder="Add context for this approval or rejection"
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  if (!canApprove || isSubmitting) return
-                  void submitDecision('approve')
-                }}
-                className={`flex-1 px-4 py-2 rounded font-medium text-sm transition-colors ${
-                  canApprove && !isSubmitting
-                    ? 'border border-[#2ea043] bg-[#238636] text-white hover:bg-[#2ea043]'
-                    : 'cursor-not-allowed border border-[#30363d] bg-[#21262d] text-slate-500'
-                }`}
-                disabled={!canApprove || isSubmitting}
-              >
-                {isSubmitting ? 'Submitting...' : `Approve ${gateName}`}
-              </button>
-              <button
-                onClick={() => {
-                  if (isSubmitting) return
-                  void submitDecision('reject')
-                }}
-                className="flex-1 rounded border border-[#6e2f36] bg-[#2d1617] px-4 py-2 text-sm font-medium text-[#f85149] transition-colors hover:border-[#f85149] hover:bg-[#3d1d1f] disabled:opacity-50"
-                disabled={isSubmitting}
-              >
-                Reject
-              </button>
-              <button
-                onClick={onClose}
-                className="flex-1 rounded border border-[#30363d] bg-[#21262d] px-4 py-2 text-sm font-medium text-[#c9d1d9] transition-colors hover:border-[#8b949e] hover:bg-[#30363d] disabled:opacity-50"
-                disabled={isSubmitting}
-              >
-                Close
-              </button>
-            </div>
+            {isDecisionGate ? (
+              <>
+                <label className="mb-2 block text-xs font-semibold uppercase text-slate-400">Decision Note (optional)</label>
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  className="mb-4 w-full rounded-md border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-[#c9d1d9] focus:outline-none focus:ring-2 focus:ring-[#1f6feb]"
+                  rows={3}
+                  placeholder="Add context for this approval or rejection"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      if (!canApprove || isSubmitting) return
+                      void submitDecision('approve')
+                    }}
+                    className={`flex-1 px-4 py-2 rounded font-medium text-sm transition-colors ${
+                      canApprove && !isSubmitting
+                        ? 'border border-[#2ea043] bg-[#238636] text-white hover:bg-[#2ea043]'
+                        : 'cursor-not-allowed border border-[#30363d] bg-[#21262d] text-slate-500'
+                    }`}
+                    disabled={!canApprove || isSubmitting}
+                  >
+                    {isSubmitting ? 'Submitting...' : `Approve ${gateName}`}
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (isSubmitting) return
+                      void submitDecision('reject')
+                    }}
+                    className="flex-1 rounded border border-[#6e2f36] bg-[#2d1617] px-4 py-2 text-sm font-medium text-[#f85149] transition-colors hover:border-[#f85149] hover:bg-[#3d1d1f] disabled:opacity-50"
+                    disabled={isSubmitting}
+                  >
+                    Reject
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className="flex-1 rounded border border-[#30363d] bg-[#21262d] px-4 py-2 text-sm font-medium text-[#c9d1d9] transition-colors hover:border-[#8b949e] hover:bg-[#30363d] disabled:opacity-50"
+                    disabled={isSubmitting}
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="mb-4 rounded border border-[#1f6feb]/30 bg-[#111d2e] px-3 py-3 text-sm text-[#79c0ff]">
+                  Implementation is an execution stage. Push work to the tracked branch, attach validation evidence, and wait for merge approval to open.
+                </p>
+                <button
+                  onClick={onClose}
+                  className="w-full rounded border border-[#30363d] bg-[#21262d] px-4 py-2 text-sm font-medium text-[#c9d1d9] transition-colors hover:border-[#8b949e] hover:bg-[#30363d] disabled:opacity-50"
+                  disabled={isSubmitting}
+                >
+                  Close
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
