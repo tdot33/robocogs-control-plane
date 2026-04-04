@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { ADMIN_SESSION_COOKIE, isAdminSessionValid } from '@/lib/admin-auth'
-import { appendLog, createGateApproval, getTaskById, setTaskAgent, setTaskGate, updateTaskStatus } from '@/lib/db'
-import { areGateAnswersComplete, getApprovalTransition } from '@/lib/gates'
-import {
-  buildImplementationPackage,
-  buildPlanPackage,
-  serializeImplementationPackageLog,
-  serializePlanPackageLog,
-} from '@/lib/plan-package'
-import { validateTaskIssueBranchPair } from '@/lib/traceability'
+import { appendLog, createGateApproval, getTaskById, setTaskGate, updateTaskStatus } from '@/lib/db'
+import { areGateAnswersComplete } from '@/lib/gates'
+import { applyApprovedGateTransition } from '@/lib/gate-approval-flow'
 
 interface DecisionBody {
   decision?: 'approve' | 'reject'
@@ -53,13 +47,6 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ta
       return NextResponse.json({ error: 'All gate questions must be answered before approval' }, { status: 400 })
     }
 
-    if (gateName === 'plan-approval') {
-      const traceability = validateTaskIssueBranchPair(task.branch, task.issue_number)
-      if (traceability.status !== 'valid' && traceability.status !== 'not-required') {
-        return NextResponse.json({ error: traceability.message }, { status: 409 })
-      }
-    }
-
     const approvalAnswers: Record<string, string | boolean> = {
       ...answers,
       decision: 'approve',
@@ -75,36 +62,13 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ta
       answers: approvalAnswers,
     })
 
-    if (gateName === 'intake') {
-      const planPackage = buildPlanPackage({
-        task,
-        answers,
-        note,
-      })
-      await appendLog(taskId, 'architect', 'Generated plan package for plan approval')
-      await appendLog(taskId, 'architect', serializePlanPackageLog(planPackage), 'debug')
-    }
-
-    const transition = getApprovalTransition(gateName)
-    await updateTaskStatus(taskId, transition.nextStatus, transition.nextProgress)
-    await setTaskGate(taskId, transition.nextGate)
-    if (gateName === 'plan-approval') {
-      const implementationPackage = buildImplementationPackage({
-        task,
-        answers,
-        note,
-      })
-      const traceability = validateTaskIssueBranchPair(task.branch, task.issue_number)
-      await setTaskAgent(taskId, 'implementer')
-      await appendLog(taskId, 'traceability-guard', traceability.message)
-      await appendLog(taskId, 'implementer', 'Generated implementation handoff package for execution')
-      await appendLog(taskId, 'implementer', serializeImplementationPackageLog(implementationPackage), 'debug')
-    }
-    await appendLog(
+    await applyApprovedGateTransition({
       taskId,
+      gateName,
       actor,
-      `Approved ${gateName} in dashboard. ${transition.logMessage}${note ? `: ${note}` : ''}`
-    )
+      answers: approvalAnswers,
+      note,
+    })
   } else {
     await updateTaskStatus(taskId, 'rejected', 0)
     await setTaskGate(taskId, gateName)
