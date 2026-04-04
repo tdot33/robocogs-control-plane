@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { TaskReviewDrawer } from './task-review-drawer'
 
 export interface TaskData {
@@ -33,6 +33,21 @@ const statusColors: Record<string, { bg: string; text: string; badge: string }> 
 export function AgentTasksTable({ tasks }: AgentTasksTableProps) {
   const [selectedTask, setSelectedTask] = useState<TaskData | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+
+  useEffect(() => {
+    if (!selectedTask) {
+      return
+    }
+
+    const refreshedTask = tasks.find((task) => task.id === selectedTask.id)
+    if (refreshedTask) {
+      setSelectedTask(refreshedTask)
+      return
+    }
+
+    setSelectedTask(null)
+    setIsDrawerOpen(false)
+  }, [selectedTask, tasks])
 
   const openReview = (task: TaskData) => {
     setSelectedTask(task)
