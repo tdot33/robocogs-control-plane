@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import type { TaskData } from './agent-tasks-table'
 import { areGateAnswersComplete, getGatePack, getGateTimelineState } from '@/lib/gates'
-import type { AuditorReviewPackage, ImplementationEvidence, ImplementationPackage, PlanPackage } from '@/lib/plan-package'
+import type { AuditorReviewPackage, ImplementationEvidence, ImplementationPackage, PlanPackage, PromotionPackage } from '@/lib/plan-package'
 
 interface TaskReviewDrawerProps {
   task: TaskData
@@ -29,6 +29,7 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
   const [implementationPackage, setImplementationPackage] = useState<ImplementationPackage | null>(null)
   const [implementationEvidence, setImplementationEvidence] = useState<ImplementationEvidence | null>(null)
   const [auditorReviewPackage, setAuditorReviewPackage] = useState<AuditorReviewPackage | null>(null)
+  const [promotionPackage, setPromotionPackage] = useState<PromotionPackage | null>(null)
   const [gateAnswers, setGateAnswers] = useState<Record<string, string>>({})
   const [note, setNote] = useState('')
   const [implementationEvidenceForm, setImplementationEvidenceForm] = useState({
@@ -85,12 +86,14 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
         setImplementationPackage(data.implementationPackage || null)
         setImplementationEvidence(data.implementationEvidence || null)
         setAuditorReviewPackage(data.auditorReviewPackage || null)
+        setPromotionPackage(data.promotionPackage || null)
       } catch (error) {
         setLogs([])
         setPlanPackage(null)
         setImplementationPackage(null)
         setImplementationEvidence(null)
         setAuditorReviewPackage(null)
+        setPromotionPackage(null)
         setErrorMessage(error instanceof Error ? error.message : 'Failed to load logs')
       } finally {
         setLoading(false)
@@ -170,6 +173,7 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
     'plan-approval': 'Plan Approval',
     implementation: 'Implementation',
     'merge-approval': 'Merge Approval',
+    'promotion-approval': 'Promotion Approval',
   }
 
   const gateStateStyles: Record<string, string> = {
@@ -313,6 +317,19 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
                   <PlanList title="Review Focus" items={auditorReviewPackage.reviewFocus} />
                   <PlanList title="Merge Criteria" items={auditorReviewPackage.mergeCriteria} />
                   <PlanList title="Closeout Expectations" items={auditorReviewPackage.closeoutExpectations} />
+                </div>
+              </div>
+            ) : null}
+
+            {promotionPackage ? (
+              <div className="border-b border-[#30363d] p-6">
+                <h3 className="mb-3 font-semibold text-white">Promotion Package</h3>
+                <p className="text-sm text-slate-300">{promotionPackage.summary}</p>
+
+                <div className="mt-4 space-y-4 text-sm text-slate-200">
+                  <PlanList title="Release Context" items={promotionPackage.releaseContext} />
+                  <PlanList title="Founder Checklist" items={promotionPackage.founderChecklist} />
+                  <PlanList title="Rollback Expectations" items={promotionPackage.rollbackExpectations} />
                 </div>
               </div>
             ) : null}

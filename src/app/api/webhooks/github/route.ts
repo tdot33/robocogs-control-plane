@@ -212,6 +212,8 @@ export async function POST(request: NextRequest) {
       const labelNames = Array.isArray(pull_request.labels) ? pull_request.labels.map((label: { name?: string }) => label.name).filter(Boolean) : []
       const hasOrchestrationLabel = payload.label?.name === ORCHESTRATION_LABEL || labelNames.includes(ORCHESTRATION_LABEL)
       const shouldTriggerOrchestration = hasOrchestrationLabel && ['labeled', 'opened', 'reopened', 'synchronize', 'ready_for_review'].includes(prAction)
+      const isPromotionPr = pull_request.base?.ref === 'master' && pull_request.head?.ref === 'chet-dev'
+      const shouldTriggerPromotion = isPromotionPr && ['opened', 'reopened', 'synchronize', 'ready_for_review'].includes(prAction)
 
       if (shouldTriggerOrchestration) {
         await inngest.send({
@@ -235,6 +237,23 @@ export async function POST(request: NextRequest) {
           repoOwner,
           repoName,
           installationId,
+        })
+      }
+
+      if (shouldTriggerPromotion) {
+        await inngest.send({
+          name: 'orchestration/promotion.requested',
+          data: {
+            prNumber: pull_request.number,
+            repo: repository.full_name,
+            repoOwner,
+            repoName,
+            baseBranch: pull_request.base.ref,
+            headBranch: pull_request.head.ref,
+            title: pull_request.title,
+            htmlUrl: pull_request.html_url,
+            installationId,
+          },
         })
       }
     }
