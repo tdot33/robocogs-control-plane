@@ -38,6 +38,10 @@ export interface GateApproval {
   comment_id: number | null
 }
 
+interface GateApprovalRow extends Omit<GateApproval, 'answers'> {
+  answers: string
+}
+
 let dbClient: ReturnType<typeof createClient> | null = null
 
 function getDbClient() {
@@ -171,4 +175,18 @@ export async function createGateApproval(input: {
     comment_url: input.commentUrl || null,
     comment_id: input.commentId || null,
   }
+}
+
+export async function getLatestGateApproval(taskId: string, gateName: string): Promise<GateApproval | null> {
+  const result = await db.execute(
+    'SELECT * FROM gate_approvals WHERE task_id = ? AND gate_name = ? ORDER BY approved_at DESC LIMIT 1',
+    [taskId, gateName]
+  )
+
+  const row = (result.rows[0] as unknown as GateApprovalRow) || null
+  if (!row) {
+    return null
+  }
+
+  return row
 }
