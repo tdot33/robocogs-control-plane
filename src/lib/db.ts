@@ -89,6 +89,90 @@ export async function getTaskByBranch(branch: string): Promise<AgentTask | null>
   return (result.rows[0] as unknown as AgentTask) || null
 }
 
+export type CreateWorkStartTaskResult =
+  | { outcome: 'created'; task: AgentTask }
+  | { outcome: 'existing'; task: AgentTask }
+  | { outcome: 'session-limit' }
+  | { outcome: 'scope-conflict'; task: AgentTask | null }
+
+export async function createWorkStartTaskIfAllowed(input: Omit<AgentTask, 'created_at' | 'updated_at'> & { maxConcurrentSessions: number }): Promise<CreateWorkStartTaskResult> {
+  const now = new Date().toISOString()
+  const issueNumber = input.issue_number ?? 0
+  const scopeSlice = input.scope_slice ?? null
+
+  const insertResult = await db.execute(
+    `INSERT INTO agent_tasks (id, task_name, assigned_agent, status, progress, branch, issue_number, scope_slice, gate_current, created_at, updated_at)
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+     WHERE NOT EXISTS (
+       SELECT 1
+       FROM agent_tasks
+       WHERE branch = ? OR (? > 0 AND issue_number = ?)
+     )
+       AND (
+         SELECT COUNT(*)
+         FROM agent_tasks
+         WHERE status NOT IN (?, ?, ?)
+       ) < ?
+       AND (
+         ? IS NULL OR NOT EXISTS (
+           SELECT 1
+           FROM agent_tasks
+           WHERE scope_slice = ? AND status NOT IN (?, ?, ?)
+         )
+       )`,
+    [
+      input.id,
+      input.task_name,
+      input.assigned_agent,
+      input.status,
+      input.progress,
+      input.branch,
+      input.issue_number,
+      input.scope_slice,
+      input.gate_current,
+      now,
+      now,
+      input.branch,
+      issueNumber,
+      issueNumber,
+      'complete',
+      'rejected',
+      'failed',
+      input.maxConcurrentSessions,
+      scopeSlice,
+      scopeSlice,
+      'complete',
+      'rejected',
+      'failed',
+    ]
+  )
+
+  if ((insertResult.rowsAffected || 0) > 0) {
+    return {
+      outcome: 'created',
+      task: {
+        ...input,
+        created_at: now,
+        updated_at: now,
+      },
+    }
+  }
+
+  const existingTask = (input.branch ? await getTaskByBranch(input.branch) : null) || (issueNumber ? await getTaskByIssueNumber(issueNumber) : null)
+  if (existingTask) {
+    return { outcome: 'existing', task: existingTask }
+  }
+
+  if (scopeSlice) {
+    const conflictingTask = await getInFlightTaskByScopeSlice(scopeSlice)
+    if (conflictingTask) {
+      return { outcome: 'scope-conflict', task: conflictingTask }
+    }
+  }
+
+  return { outcome: 'session-limit' }
+}
+
 export async function getInFlightTaskCount(): Promise<number> {
   const result = await db.execute(
     'SELECT COUNT(*) AS count FROM agent_tasks WHERE status NOT IN (?, ?, ?)',

@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { appendLog, createTask, getInFlightTaskByScopeSlice, getInFlightTaskCount, getTaskByBranch, getTaskByIssueNumber } from '@/lib/db'
+import { appendLog, createWorkStartTaskIfAllowed } from '@/lib/db'
 import { createIssueComment, getRepoInstallationId } from '@/lib/github'
 import { formatGateQuestionComment } from '@/inngest/gate-processor'
 
@@ -74,35 +74,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Unsupported scope slice: ${scopeSlice}` }, { status: 400 })
   }
 
-  const existingTask = issueNumber ? await getTaskByIssueNumber(issueNumber) : await getTaskByBranch(branchName)
-  if (existingTask) {
-    await appendLog(existingTask.id, 'work-start-intake', `Observed work:start handoff for branch ${branchName}`)
-    return NextResponse.json({ ok: true, taskId: existingTask.id, created: false })
-  }
-
-  const inFlightTaskCount = await getInFlightTaskCount()
-  if (inFlightTaskCount >= MAX_CONCURRENT_SESSIONS) {
-    return NextResponse.json(
-      { error: `Concurrent implementation limit reached (${MAX_CONCURRENT_SESSIONS}). Finish or resequence an active session before starting another.` },
-      { status: 429 }
-    )
-  }
-
-  if (scopeSlice) {
-    const conflictingTask = await getInFlightTaskByScopeSlice(scopeSlice)
-    if (conflictingTask) {
-      return NextResponse.json(
-        {
-          error: `Scope slice ${scopeSlice} is already active on task ${conflictingTask.id}. Re-sequence the work or request explicit overlap approval.`,
-          conflictingTaskId: conflictingTask.id,
-        },
-        { status: 409 }
-      )
-    }
-  }
-
   const taskId = buildTaskId({ workKey, issueNumber })
-  await createTask({
+  const createResult = await createWorkStartTaskIfAllowed({
     id: taskId,
     task_name: title,
     assigned_agent: 'architect',
@@ -112,10 +85,33 @@ export async function POST(request: NextRequest) {
     issue_number: issueNumber || null,
     scope_slice: scopeSlice || null,
     gate_current: 'intake',
+    maxConcurrentSessions: MAX_CONCURRENT_SESSIONS,
   })
 
+  if (createResult.outcome === 'existing') {
+    await appendLog(createResult.task.id, 'work-start-intake', `Observed work:start handoff for branch ${branchName}`)
+    return NextResponse.json({ ok: true, taskId: createResult.task.id, created: false })
+  }
+
+  if (createResult.outcome === 'scope-conflict') {
+    return NextResponse.json(
+      {
+        error: `Scope slice ${scopeSlice} is already active on task ${createResult.task?.id}. Re-sequence the work or request explicit overlap approval.`,
+        conflictingTaskId: createResult.task?.id,
+      },
+      { status: 409 }
+    )
+  }
+
+  if (createResult.outcome === 'session-limit') {
+    return NextResponse.json(
+      { error: `Concurrent implementation limit reached (${MAX_CONCURRENT_SESSIONS}). Finish or resequence an active session before starting another.` },
+      { status: 429 }
+    )
+  }
+
   const scopeSuffix = scopeSlice ? `, scope ${scopeSlice}` : ''
-  await appendLog(taskId, 'work-start-intake', `Created orchestration task from work:start (${taskType}${scopeSuffix})`)
+  await appendLog(createResult.task.id, 'work-start-intake', `Created orchestration task from work:start (${taskType}${scopeSuffix})`)
 
   if (issueNumber > 0) {
     try {
@@ -125,13 +121,13 @@ export async function POST(request: NextRequest) {
         repoOwner,
         repoName,
         issueNumber,
-        formatGateQuestionComment('intake', taskId)
+        formatGateQuestionComment('intake', createResult.task.id)
       )
-      await appendLog(taskId, 'work-start-intake', `Posted intake gate comment: ${comment.url}`)
+      await appendLog(createResult.task.id, 'work-start-intake', `Posted intake gate comment: ${comment.url}`)
     } catch (error) {
-      await appendLog(taskId, 'work-start-intake', `Failed to post intake gate comment: ${error}`, 'warn')
+      await appendLog(createResult.task.id, 'work-start-intake', `Failed to post intake gate comment: ${error}`, 'warn')
     }
   }
 
-  return NextResponse.json({ ok: true, taskId, created: true })
+  return NextResponse.json({ ok: true, taskId: createResult.task.id, created: true })
 }
