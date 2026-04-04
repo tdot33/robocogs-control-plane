@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import type { TaskData } from './agent-tasks-table'
 import { areGateAnswersComplete, getGatePack, getGateTimelineState } from '@/lib/gates'
 import type { PlanPackage } from '@/lib/plan-package'
+import { validateTaskIssueBranchPair } from '@/lib/traceability'
 
 interface TaskReviewDrawerProps {
   task: TaskData
@@ -35,7 +36,9 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
   const gateName = task.gate_current || 'manual-review'
   const gatePack = getGatePack(gateName)
   const gateTimeline = getGateTimelineState(task.gate_current, task.status)
-  const canApprove = areGateAnswersComplete(gateName, gateAnswers)
+  const traceability = validateTaskIssueBranchPair(task.branch, task.issue_number)
+  const traceabilityBlocksApproval = gateName === 'plan-approval' && !['valid', 'not-required'].includes(traceability.status)
+  const canApprove = areGateAnswersComplete(gateName, gateAnswers) && !traceabilityBlocksApproval
 
   useEffect(() => {
     setIsMounted(true)
@@ -204,6 +207,21 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
                 })}
               </div>
             </div>
+
+            {gateName === 'plan-approval' ? (
+              <div className="border-b border-[#30363d] p-6">
+                <h3 className="mb-3 font-semibold text-white">Traceability Guard</h3>
+                <div
+                  className={`rounded border px-3 py-3 text-sm ${
+                    traceability.status === 'valid' || traceability.status === 'not-required'
+                      ? 'border-[#1f5132] bg-[#12261e] text-[#3fb950]'
+                      : 'border-[#6e2f36] bg-[#2d1617] text-[#f85149]'
+                  }`}
+                >
+                  <p>{traceability.message}</p>
+                </div>
+              </div>
+            ) : null}
 
             {planPackage ? (
               <div className="border-b border-[#30363d] p-6">
