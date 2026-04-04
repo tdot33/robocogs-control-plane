@@ -10,7 +10,7 @@ Apply these rules whenever defining or updating shared or repository-level agent
 
 ## Scope model
 
-- The `.github-shared/` folder is the canonical authoring source for shared workspace customizations.
+- The repo-versioned `.github-shared/` source in `robocogs/` is the canonical authoring source for shared workspace customizations.
 - Repository `.github/` copies are runtime artifacts for local and cloud discovery.
 - Repository-specific overlays may add local rules, but they must stay additive and avoid duplicating the shared baseline.
 
