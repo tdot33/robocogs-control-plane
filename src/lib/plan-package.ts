@@ -31,6 +31,21 @@ export interface ImplementationPackage {
 
 export const IMPLEMENTATION_PACKAGE_LOG_PREFIX = '[implementation-package] '
 
+export interface ImplementationEvidence {
+  version: number
+  submittedAt: string
+  taskId: string
+  gateName: 'implementation'
+  branch: string
+  prUrl: string
+  headSha: string
+  validationSummary: string
+  scopeSummary: string
+  rollbackNotes: string
+}
+
+export const IMPLEMENTATION_EVIDENCE_LOG_PREFIX = '[implementation-evidence] '
+
 export function buildPlanPackage(input: {
   task: AgentTask
   answers: Record<string, string>
@@ -140,6 +155,33 @@ export function serializeImplementationPackageLog(implementationPackage: Impleme
   return `${IMPLEMENTATION_PACKAGE_LOG_PREFIX}${JSON.stringify(implementationPackage)}`
 }
 
+export function buildImplementationEvidence(input: {
+  taskId: string
+  branch: string | null
+  prUrl?: string
+  headSha: string
+  validationSummary: string
+  scopeSummary: string
+  rollbackNotes: string
+}): ImplementationEvidence {
+  return {
+    version: 1,
+    submittedAt: new Date().toISOString(),
+    taskId: input.taskId,
+    gateName: 'implementation',
+    branch: input.branch || '',
+    prUrl: (input.prUrl || '').trim(),
+    headSha: input.headSha.trim(),
+    validationSummary: input.validationSummary.trim(),
+    scopeSummary: input.scopeSummary.trim(),
+    rollbackNotes: input.rollbackNotes.trim(),
+  }
+}
+
+export function serializeImplementationEvidenceLog(implementationEvidence: ImplementationEvidence): string {
+  return `${IMPLEMENTATION_EVIDENCE_LOG_PREFIX}${JSON.stringify(implementationEvidence)}`
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
@@ -195,6 +237,25 @@ function normalizeImplementationPackage(value: unknown): ImplementationPackage |
   }
 }
 
+function normalizeImplementationEvidence(value: unknown): ImplementationEvidence | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  return {
+    version: asNumber(value.version),
+    submittedAt: asString(value.submittedAt),
+    taskId: asString(value.taskId),
+    gateName: 'implementation',
+    branch: asString(value.branch),
+    prUrl: asString(value.prUrl),
+    headSha: asString(value.headSha),
+    validationSummary: asString(value.validationSummary),
+    scopeSummary: asString(value.scopeSummary),
+    rollbackNotes: asString(value.rollbackNotes),
+  }
+}
+
 export function parsePlanPackageLog(message: string): PlanPackage | null {
   if (!message.startsWith(PLAN_PACKAGE_LOG_PREFIX)) {
     return null
@@ -214,6 +275,18 @@ export function parseImplementationPackageLog(message: string): ImplementationPa
 
   try {
     return normalizeImplementationPackage(JSON.parse(message.slice(IMPLEMENTATION_PACKAGE_LOG_PREFIX.length)))
+  } catch {
+    return null
+  }
+}
+
+export function parseImplementationEvidenceLog(message: string): ImplementationEvidence | null {
+  if (!message.startsWith(IMPLEMENTATION_EVIDENCE_LOG_PREFIX)) {
+    return null
+  }
+
+  try {
+    return normalizeImplementationEvidence(JSON.parse(message.slice(IMPLEMENTATION_EVIDENCE_LOG_PREFIX.length)))
   } catch {
     return null
   }
