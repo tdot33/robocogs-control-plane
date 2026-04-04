@@ -1,6 +1,51 @@
-import { inngest, OrchestrationEvents } from './client'
-import { updateTaskStatus, appendLog, getTaskById } from '@/lib/db'
+import { inngest } from './client'
+import { updateTaskStatus, appendLog, getTaskById, createGateApproval, setTaskGate } from '@/lib/db'
 import { createIssueComment } from '@/lib/github'
+
+function coerceAnswer(value: string): string | boolean {
+  const normalized = value.trim().toLowerCase()
+  if (normalized === 'yes' || normalized === 'true' || normalized === 'approve' || normalized === 'go') {
+    return true
+  }
+  if (normalized === 'no' || normalized === 'false' || normalized === 'reject' || normalized === 'hold') {
+    return false
+  }
+  return value.trim()
+}
+
+function parseGateResponse(commentBody: string):
+  | { decision: 'approve' | 'reject'; taskId: string; answers: Record<string, string | boolean> }
+  | null {
+  const normalized = commentBody.trim()
+  const match = normalized.match(/^(approve|reject)\s+([^\s]+)(?:\s+([\s\S]+))?$/i)
+  if (!match) {
+    return null
+  }
+
+  const decision = match[1].toLowerCase() as 'approve' | 'reject'
+  const taskId = match[2]
+  const answers: Record<string, string | boolean> = { decision }
+  const args = (match[3] || '').trim()
+
+  if (!args) {
+    return { decision, taskId, answers }
+  }
+
+  for (const token of args.split(/\s+/)) {
+    const splitIndex = token.indexOf('=')
+    if (splitIndex === -1) {
+      continue
+    }
+    const key = token.slice(0, splitIndex).trim()
+    const value = token.slice(splitIndex + 1).trim()
+    if (!key || !value) {
+      continue
+    }
+    answers[key] = coerceAnswer(value)
+  }
+
+  return { decision, taskId, answers }
+}
 
 // Load gate question packs from robocogs repo (these would be synced)
 const GATE_QUESTION_PACKS: Record<string, { questions: Array<{ id: string; label: string; type: 'yes-no' | 'single-choice' | 'multi-choice' }> }> = {
@@ -122,7 +167,16 @@ export const gateProcessor = inngest.createFunction(
 
       // Step 4: Update task to approved
       await step.run('finalize-approval', async () => {
-        await updateTaskStatus(taskId, 'approved', 100)
+        if (gateName === 'intake') {
+          await updateTaskStatus(taskId, 'running', 25)
+          await setTaskGate(taskId, 'implementation')
+        } else if (gateName === 'merge-approval') {
+          await updateTaskStatus(taskId, 'complete', 100)
+          await setTaskGate(taskId, 'done')
+        } else {
+          await updateTaskStatus(taskId, 'approved', 100)
+        }
+
         await appendLog(
           taskId,
           'gate-processor',
@@ -159,5 +213,70 @@ export const hardBlockProcessor = inngest.createFunction(
     })
 
     return { status: 'hard_blocked', taskId, gateName }
+  }
+)
+
+export const gateResponseHandler = inngest.createFunction(
+  { id: 'gate-response-handler', concurrency: { limit: 5 } },
+  { event: 'orchestration/gate.response' },
+  async ({ event, step }) => {
+    const parsed = parseGateResponse(event.data.commentBody)
+    if (!parsed) {
+      return { status: 'ignored-unrecognized-comment', commentId: event.data.commentId }
+    }
+
+    const task = await step.run('load-task', async () => getTaskById(parsed.taskId))
+    if (!task) {
+      return { status: 'ignored-task-not-found', taskId: parsed.taskId }
+    }
+
+    await step.run('log-gate-response', async () => {
+      await appendLog(task.id, 'gate-response-handler', `Received ${parsed.decision} response from ${event.data.author}`)
+    })
+
+    if (parsed.decision === 'approve') {
+      await step.run('record-approval', async () => {
+        await createGateApproval({
+          taskId: task.id,
+          gateName: task.gate_current || 'unknown',
+          approvedBy: event.data.author,
+          answers: parsed.answers,
+          commentUrl: event.data.htmlUrl,
+          commentId: event.data.commentId,
+        })
+      })
+
+      await step.run('emit-approval-event', async () => {
+        await inngest.send({
+          name: 'orchestration/gate.approved',
+          data: {
+            taskId: task.id,
+            gateName: task.gate_current || 'unknown',
+            approvedBy: event.data.author,
+            answers: parsed.answers,
+          },
+        })
+      })
+
+      return { status: 'approved', taskId: task.id }
+    }
+
+    await step.run('emit-rejection-event', async () => {
+      await inngest.send({
+        name: 'orchestration/gate.hard_blocked',
+        data: {
+          taskId: task.id,
+          gateName: task.gate_current || 'unknown',
+          blockedBy: event.data.author,
+          blockReason:
+            typeof parsed.answers.reason === 'string' && parsed.answers.reason
+              ? parsed.answers.reason
+              : 'Rejected via GitHub comment',
+          blockedAnswers: parsed.answers,
+        },
+      })
+    })
+
+    return { status: 'rejected', taskId: task.id }
   }
 )

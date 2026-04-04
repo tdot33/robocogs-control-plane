@@ -18,6 +18,18 @@ export const inngest = new Inngest({
  */
 
 export type OrchestrationEvents = {
+  'orchestration/pr.labeled': {
+    data: {
+      prNumber: number
+      repo: string
+      owner: string
+      repoName: string
+      branch: string
+      title: string
+      label: string
+      installationId: number
+    }
+  }
   'orchestration/task.created': {
     data: {
       taskId: string
@@ -60,6 +72,19 @@ export type OrchestrationEvents = {
       answers: Record<string, string | boolean>
     }
   }
+  'orchestration/gate.response': {
+    data: {
+      issueNumber: number
+      commentId: number
+      commentBody: string
+      author: string
+      repo: string
+      repoOwner: string
+      repoName: string
+      installationId: number
+      htmlUrl: string
+    }
+  }
   'orchestration/gate.hard_blocked': {
     data: {
       taskId: string
@@ -67,6 +92,20 @@ export type OrchestrationEvents = {
       blockedBy: string
       blockReason: string
       blockedAnswers: Record<string, string | boolean>
+    }
+  }
+  'orchestration/ci.check_completed': {
+    data: {
+      checkSuiteId: number
+      status: string
+      workflowName: string
+      repo: string
+      repoOwner: string
+      repoName: string
+      installationId: number
+      headSha: string
+      headBranch: string
+      htmlUrl: string
     }
   }
   'orchestration/commit.traceability_failure': {

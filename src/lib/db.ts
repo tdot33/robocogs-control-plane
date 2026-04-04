@@ -27,6 +27,17 @@ export interface AgentLog {
   created_at: string
 }
 
+export interface GateApproval {
+  id: string
+  task_id: string
+  gate_name: string
+  approved_by: string
+  answers: string
+  approved_at: string
+  comment_url: string | null
+  comment_id: number | null
+}
+
 let dbClient: ReturnType<typeof createClient> | null = null
 
 function getDbClient() {
@@ -64,6 +75,16 @@ export async function getTaskById(taskId: string): Promise<AgentTask | null> {
   return (result.rows[0] as unknown as AgentTask) || null
 }
 
+export async function getTaskByIssueNumber(issueNumber: number): Promise<AgentTask | null> {
+  const result = await db.execute('SELECT * FROM agent_tasks WHERE issue_number = ? ORDER BY created_at DESC LIMIT 1', [issueNumber])
+  return (result.rows[0] as unknown as AgentTask) || null
+}
+
+export async function getTaskByBranch(branch: string): Promise<AgentTask | null> {
+  const result = await db.execute('SELECT * FROM agent_tasks WHERE branch = ? ORDER BY created_at DESC LIMIT 1', [branch])
+  return (result.rows[0] as unknown as AgentTask) || null
+}
+
 export async function updateTaskStatus(taskId: string, status: TaskStatus, progress?: number): Promise<void> {
   const query = progress !== undefined 
     ? 'UPDATE agent_tasks SET status = ?, progress = ?, updated_at = datetime(?) WHERE id = ?'
@@ -74,6 +95,13 @@ export async function updateTaskStatus(taskId: string, status: TaskStatus, progr
     : [status, new Date().toISOString(), taskId]
   
   await db.execute(query, params)
+}
+
+export async function setTaskGate(taskId: string, gateName: string | null): Promise<void> {
+  await db.execute(
+    'UPDATE agent_tasks SET gate_current = ?, updated_at = datetime(?) WHERE id = ?',
+    [gateName, new Date().toISOString(), taskId]
+  )
 }
 
 export async function createTask(task: Omit<AgentTask, 'created_at' | 'updated_at'>): Promise<AgentTask> {
@@ -98,4 +126,42 @@ export async function appendLog(taskId: string, agent: string, message: string, 
 export async function getTaskLogs(taskId: string): Promise<AgentLog[]> {
   const result = await db.execute('SELECT * FROM agent_logs WHERE task_id = ? ORDER BY created_at DESC LIMIT 100', [taskId])
   return result.rows as unknown as AgentLog[]
+}
+
+export async function createGateApproval(input: {
+  taskId: string
+  gateName: string
+  approvedBy: string
+  answers: Record<string, string | boolean>
+  commentUrl?: string
+  commentId?: number
+}): Promise<GateApproval> {
+  const id = `approval_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
+  const approvedAt = new Date().toISOString()
+  const answers = JSON.stringify(input.answers)
+
+  await db.execute(
+    'INSERT INTO gate_approvals (id, task_id, gate_name, approved_by, answers, approved_at, comment_url, comment_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [
+      id,
+      input.taskId,
+      input.gateName,
+      input.approvedBy,
+      answers,
+      approvedAt,
+      input.commentUrl || null,
+      input.commentId || null,
+    ]
+  )
+
+  return {
+    id,
+    task_id: input.taskId,
+    gate_name: input.gateName,
+    approved_by: input.approvedBy,
+    answers,
+    approved_at: approvedAt,
+    comment_url: input.commentUrl || null,
+    comment_id: input.commentId || null,
+  }
 }

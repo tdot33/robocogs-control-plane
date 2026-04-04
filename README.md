@@ -147,13 +147,27 @@ Gate approval history:
 
 - `gate-processor` — Posts gate questions as GitHub comments, waits for founder approval
 - `hard-block-processor` — Handles gate rejections (hard blocks)
+- `gate-response-handler` — Parses GitHub approval/rejection comments and emits gate resolution events
 
 ### Task Lifecycle
 
+- `pr-labeled-handler` — Creates orchestration tasks when a PR is labeled for orchestration and queues the intake gate
 - `task-lifecycle` — Creates task records and manages initial state
 - `status-update-handler` — Processes task state transitions
+- `ci-check-completed-handler` — Advances successful tasks to merge approval or fails them on CI errors
 - `commit-traceability-handler` — Logs commit metadata failures
 - `scope-conflict-handler` — Manages parallel session scope conflicts
+
+## GitHub Automation Flow
+
+1. A PR in the main `robocogs` repo is labeled `orchestration`.
+2. `/api/webhooks/github` emits `orchestration/pr.labeled`.
+3. Control plane creates an `agent_tasks` record and opens the `intake` gate by posting a GitHub comment.
+4. Founder replies on the PR with `approve <taskId> ...` or `reject <taskId> ...`.
+5. Control plane parses the comment, records approval history, and resolves the active gate.
+6. After intake approval, the task moves to `running` while implementation/CI proceeds.
+7. A successful `check_suite` completion opens `merge-approval`; failed CI marks the task failed.
+8. Founder approval on `merge-approval` completes the task.
 
 ## Control Surface Dashboard
 

@@ -1,5 +1,5 @@
-import { inngest, OrchestrationEvents } from './client'
-import { updateTaskStatus, appendLog, createTask } from '@/lib/db'
+import { inngest } from './client'
+import { updateTaskStatus, appendLog, createTask, getTaskByBranch, getTaskByIssueNumber, setTaskGate } from '@/lib/db'
 
 /**
  * Task lifecycle handler: Manages all state transitions for AgentTask
@@ -56,6 +56,61 @@ export const taskLifecycle = inngest.createFunction(
   }
 )
 
+export const prLabeledHandler = inngest.createFunction(
+  { id: 'pr-labeled-handler', concurrency: { limit: 3 } },
+  { event: 'orchestration/pr.labeled' },
+  async ({ event, step }) => {
+    const { prNumber, owner, repoName, branch, title, installationId } = event.data
+
+    const existingTask = await step.run('find-existing-task', async () => getTaskByIssueNumber(prNumber))
+
+    const task =
+      existingTask ||
+      (await step.run('create-pr-task', async () => {
+        const taskId = `pr-${prNumber}`
+        const created = await createTask({
+          id: taskId,
+          task_name: title,
+          assigned_agent: 'architect',
+          status: 'pending',
+          progress: 5,
+          branch,
+          issue_number: prNumber,
+          scope_slice: null,
+          gate_current: 'intake',
+        })
+        await appendLog(taskId, 'pr-labeled-handler', `Created orchestration task from PR #${prNumber}`)
+        return created
+      }))
+
+    await step.run('log-pr-label', async () => {
+      await appendLog(task.id, 'pr-labeled-handler', `PR #${prNumber} labeled for orchestration on branch ${branch}`)
+    })
+
+    if (existingTask && ['awaiting_approval', 'running', 'approved', 'complete'].includes(existingTask.status)) {
+      return { status: 'existing-task-reused', taskId: existingTask.id, prNumber }
+    }
+
+    await step.run('queue-intake-gate', async () => {
+      await setTaskGate(task.id, 'intake')
+      await inngest.send({
+        name: 'orchestration/gate.awaiting_approval',
+        data: {
+          taskId: task.id,
+          gateName: 'intake',
+          questionPackId: 'intake',
+          repoOwner: owner,
+          repoName,
+          prNumber,
+          installationId,
+        },
+      })
+    })
+
+    return { status: 'intake-gate-queued', taskId: task.id, prNumber }
+  }
+)
+
 /**
  * Status update handler: Logs and processes state transitions
  */
@@ -93,6 +148,55 @@ export const statusUpdateHandler = inngest.createFunction(
     }
 
     return { status: 'processed', taskId, newStatus }
+  }
+)
+
+export const ciCheckCompletedHandler = inngest.createFunction(
+  { id: 'ci-check-completed-handler', concurrency: { limit: 5 } },
+  { event: 'orchestration/ci.check_completed' },
+  async ({ event, step }) => {
+    const { status, workflowName, headBranch, htmlUrl, repoOwner, repoName, installationId } = event.data
+
+    const task = await step.run('find-task-by-branch', async () => getTaskByBranch(headBranch))
+    if (!task) {
+      return { status: 'ignored-no-task', branch: headBranch }
+    }
+
+    await step.run('log-ci-result', async () => {
+      await appendLog(task.id, 'ci-check-completed-handler', `CI workflow ${workflowName} completed with status ${status}: ${htmlUrl}`)
+    })
+
+    if (status === 'success') {
+      if (task.gate_current === 'merge-approval' || task.status === 'awaiting_approval') {
+        return { status: 'already-awaiting-merge-approval', taskId: task.id }
+      }
+
+      await step.run('queue-merge-approval', async () => {
+        await updateTaskStatus(task.id, 'awaiting_approval', 85)
+        await setTaskGate(task.id, 'merge-approval')
+        await inngest.send({
+          name: 'orchestration/gate.awaiting_approval',
+          data: {
+            taskId: task.id,
+            gateName: 'merge-approval',
+            questionPackId: 'merge-approval',
+            repoOwner,
+            repoName,
+            prNumber: task.issue_number || undefined,
+            installationId,
+          },
+        })
+      })
+
+      return { status: 'merge-approval-queued', taskId: task.id }
+    }
+
+    await step.run('mark-task-failed', async () => {
+      await updateTaskStatus(task.id, 'failed', 0)
+      await appendLog(task.id, 'ci-check-completed-handler', `Marked task failed due to CI status ${status}`, 'error')
+    })
+
+    return { status: 'task-failed', taskId: task.id }
   }
 )
 

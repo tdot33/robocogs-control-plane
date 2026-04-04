@@ -123,7 +123,10 @@ export async function POST(request: NextRequest) {
 
     // Parse payload
     const payload = JSON.parse(body)
-    const { action, repository, pull_request, issue, workflow_run, check_suite, comment } = payload
+    const { action, repository, pull_request, issue, check_suite, comment, installation } = payload
+    const installationId = Number(installation?.id || 0)
+    const repoOwner = repository?.owner?.login || ''
+    const repoName = repository?.name || ''
 
     // Route based on event type
     if (eventType === 'check_suite' && check_suite) {
@@ -136,7 +139,11 @@ export async function POST(request: NextRequest) {
             status: conclusion,
             workflowName: check_suite.app?.name || 'unknown',
             repo: repository.full_name,
+            repoOwner,
+            repoName,
+            installationId,
             headSha: check_suite.head_sha,
+            headBranch: check_suite.head_branch || '',
             htmlUrl: check_suite.html_url,
           },
         })
@@ -152,9 +159,11 @@ export async function POST(request: NextRequest) {
             prNumber: pull_request.number,
             repo: repository.full_name,
             branch: pull_request.head.ref,
-            owner: repository.owner.login,
+            owner: repoOwner,
+            repoName,
             title: pull_request.title,
             label: payload.label.name,
+            installationId,
           },
         })
       }
@@ -171,6 +180,9 @@ export async function POST(request: NextRequest) {
             commentBody: comment.body,
             author: comment.user.login,
             repo: repository.full_name,
+            repoOwner,
+            repoName,
+            installationId,
             htmlUrl: comment.html_url,
           },
         })
