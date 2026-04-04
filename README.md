@@ -71,6 +71,9 @@ NEXT_PUBLIC_API_URL=http://localhost:3001
 ADMIN_UI_USERNAME=admin
 ADMIN_UI_PASSWORD=change-me
 ADMIN_UI_SESSION_SECRET=replace-with-long-random-secret
+
+# Shared secret for upstream work:start intake
+ORCHESTRATION_SHARED_SECRET=replace-with-shared-secret
 ```
 
 ### 3. Database Migrations
@@ -98,6 +101,7 @@ Visit http://localhost:3001/admin/orchestration
 ### Webhooks
 
 - **POST** `/api/webhooks/github` — Receives signed GitHub webhook events
+- **POST** `/api/orchestration/work-start` — Creates or links an orchestration task from `npm run work:start`
 
 ### Inngest
 

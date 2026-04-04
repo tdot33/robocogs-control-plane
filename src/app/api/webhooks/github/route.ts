@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateWebhookSignature } from '@/lib/webhook-validator'
 import { inngest } from '@/inngest/client'
+import { appendLog, createTask, getTaskByIssueNumber } from '@/lib/db'
+import { createIssueComment } from '@/lib/github'
+import { formatGateQuestionComment } from '@/inngest/gate-processor'
 
 const WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET
 const WEBHOOK_FORWARD_URL = process.env.WEBHOOK_FORWARD_URL
@@ -55,6 +58,51 @@ async function forwardWebhook(request: NextRequest, body: string, eventType: str
     body,
     signal: AbortSignal.timeout(10000),
   })
+}
+
+async function ensureTaskForOrchestrationPr(input: {
+  prNumber: number
+  title: string
+  branch: string
+  repoOwner: string
+  repoName: string
+  installationId: number
+}) {
+  const existingTask = await getTaskByIssueNumber(input.prNumber)
+  if (existingTask) {
+    await appendLog(existingTask.id, 'webhook-pr-fallback', `Observed orchestration label on PR #${input.prNumber}`)
+    return { taskId: existingTask.id, created: false }
+  }
+
+  const taskId = `pr-${input.prNumber}`
+  await createTask({
+    id: taskId,
+    task_name: input.title,
+    assigned_agent: 'architect',
+    status: 'awaiting_approval',
+    progress: 50,
+    branch: input.branch,
+    issue_number: input.prNumber,
+    scope_slice: null,
+    gate_current: 'intake',
+  })
+
+  await appendLog(taskId, 'webhook-pr-fallback', `Created orchestration task from PR #${input.prNumber}`)
+
+  if (input.installationId > 0) {
+    const comment = await createIssueComment(
+      input.installationId,
+      input.repoOwner,
+      input.repoName,
+      input.prNumber,
+      formatGateQuestionComment('intake', taskId)
+    )
+    await appendLog(taskId, 'webhook-pr-fallback', `Posted intake gate comment: ${comment.url}`)
+  } else {
+    await appendLog(taskId, 'webhook-pr-fallback', 'Skipped intake gate comment because installationId was missing', 'warn')
+  }
+
+  return { taskId, created: true }
 }
 
 /**
@@ -178,6 +226,15 @@ export async function POST(request: NextRequest) {
             label: ORCHESTRATION_LABEL,
             installationId,
           },
+        })
+
+        await ensureTaskForOrchestrationPr({
+          prNumber: pull_request.number,
+          title: pull_request.title,
+          branch: pull_request.head.ref,
+          repoOwner,
+          repoName,
+          installationId,
         })
       }
     }

@@ -28,6 +28,15 @@ export async function getInstallationClient(installationId: number | string): Pr
   return installationToken as unknown as Octokit
 }
 
+export async function getRepoInstallationId(owner: string, repo: string): Promise<number> {
+  const response = await getGitHubApp().octokit.request('GET /repos/{owner}/{repo}/installation', {
+    owner,
+    repo,
+  })
+
+  return response.data.id
+}
+
 export async function dispatchWorkflow(
   installationId: number,
   owner: string,

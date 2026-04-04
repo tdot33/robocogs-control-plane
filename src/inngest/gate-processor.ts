@@ -83,7 +83,7 @@ const GATE_QUESTION_PACKS: Record<string, { questions: Array<{ id: string; label
 /**
  * Formats gate question pack as GitHub issue comment with click-first options
  */
-function formatGateQuestionComment(gateName: string, taskId: string): string {
+export function formatGateQuestionComment(gateName: string, taskId: string): string {
   const pack = GATE_QUESTION_PACKS[gateName]
   if (!pack) {
     return `**Gate Approval Required: ${gateName}**\nNo question pack found for gate.`
