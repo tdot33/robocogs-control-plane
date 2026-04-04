@@ -4,7 +4,9 @@ import { ADMIN_SESSION_COOKIE, isAdminSessionValid } from '@/lib/admin-auth'
 import { getLatestGateApproval, getTaskById, getTaskLogs } from '@/lib/db'
 import {
   buildImplementationPackage,
+  parseImplementationEvidenceLog,
   buildPlanPackage,
+  type ImplementationEvidence,
   parseImplementationPackageLog,
   parsePlanPackageLog,
 } from '@/lib/plan-package'
@@ -51,6 +53,17 @@ function extractImplementationPackage(logs: LogPayload[]) {
     const implementationPackage = parseImplementationPackageLog(log.message)
     if (implementationPackage) {
       return implementationPackage
+    }
+  }
+
+  return null
+}
+
+function extractImplementationEvidence(logs: LogPayload[]): ImplementationEvidence | null {
+  for (const log of logs) {
+    const implementationEvidence = parseImplementationEvidenceLog(log.message)
+    if (implementationEvidence) {
+      return implementationEvidence
     }
   }
 
@@ -130,11 +143,15 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ ta
 
   const logs = await getTaskLogs(taskId)
   const filteredLogs = filterSupersededLogs(logs as LogPayload[]).filter(
-    (log) => !parsePlanPackageLog(log.message) && !parseImplementationPackageLog(log.message)
+    (log) =>
+      !parsePlanPackageLog(log.message) &&
+      !parseImplementationPackageLog(log.message) &&
+      !parseImplementationEvidenceLog(log.message)
   )
   return NextResponse.json({
     logs: filteredLogs,
     planPackage: await loadPlanPackage(taskId, logs as LogPayload[]),
     implementationPackage: await loadImplementationPackage(taskId, logs as LogPayload[]),
+    implementationEvidence: extractImplementationEvidence(logs as LogPayload[]),
   })
 }
