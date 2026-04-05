@@ -42,6 +42,11 @@ Apply these rules whenever defining or updating shared or repository-level agent
 
 - Respect repository workflow rules and validation gates.
 - Do not bypass issue, branch, or PR guardrails when behavior changes are planned.
+- Prefer GitHub MCP for GitHub read operations such as issue/PR context, search, and status-check discovery when that reduces redundant questioning or manual lookup.
+- Allow low-risk GitHub MCP writes such as routine issue or PR comments only when they do not replace a repository-owned workflow helper or orchestration control path.
+- Require explicit user confirmation before high-risk GitHub MCP writes such as issue or PR creation outside canonical helpers, label changes, closure/reopen actions, workflow triggers, merges, or comments that act as release or approval decisions.
+- Preserve repository-owned lifecycle paths when they encode traceability or side effects. If a repository provides helpers like `work:start`, `work:pr`, `work:promote`, or a GitHub App orchestration flow, treat those as canonical over equivalent GitHub MCP mutations.
+- Keep GitHub MCP workflow policy in governance and workflow instruction surfaces, not in knowledge-base or support-content sources unless a separate knowledge-policy change is explicitly approved.
 - Avoid destructive git recommendations unless explicitly approved.
 - Prefer a separate git worktree for concurrent issue-scoped sessions or when unrelated local changes must remain untouched.
 - Treat git worktrees as workspace isolation only; if scope ownership or shared contracts overlap, escalate instead of parallelizing blindly.
