@@ -81,6 +81,14 @@ Before writing any code:
 5. After any change to API routes, Inngest functions, or database helpers, run `npm run build` to confirm no TypeScript errors.
 6. Do not modify `db/migrations/001_initial.sql`. Add a new numbered migration file for schema changes.
 
+## GitHub MCP usage
+
+- Prefer GitHub MCP for GitHub read operations such as linked issue or PR context, review state, duplicate discovery, and status-check inspection.
+- Low-risk GitHub MCP writes such as routine issue or PR comments are acceptable only when they do not replace the control-plane GitHub App, webhook, or Inngest orchestration path.
+- Keep GitHub App writes, webhook-driven state changes, gate approvals, workflow dispatch, and any orchestration lifecycle mutations on the existing Octokit and Inngest control path.
+- Require explicit user confirmation before any high-risk GitHub MCP write such as issue or PR creation outside canonical helpers, labels, closure or reopen actions, workflow triggers, merges, or comments that act as approvals.
+- Keep GH MCP workflow policy in instruction and governance surfaces, not in knowledge-base content or the versioned `docs/ORCHESTRATION_V1_*` cross-repo contracts.
+
 ## Running Locally
 
 ```bash
