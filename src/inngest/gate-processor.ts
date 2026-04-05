@@ -1,7 +1,8 @@
 import { inngest } from './client'
-import { updateTaskStatus, appendLog, getTaskById, createGateApproval, setTaskGate } from '@/lib/db'
+import { updateTaskStatus, appendLog, getTaskById, createGateApproval } from '@/lib/db'
 import { createIssueComment } from '@/lib/github'
-import { GATE_QUESTION_PACKS, getApprovalTransition } from '@/lib/gates'
+import { areGateAnswersComplete, GATE_QUESTION_PACKS } from '@/lib/gates'
+import { applyApprovedGateTransition, normalizeApprovalAnswers } from '@/lib/gate-approval-flow'
 
 function coerceAnswer(value: string): string | boolean {
   const normalized = value.trim().toLowerCase()
@@ -135,15 +136,13 @@ export const gateProcessor = inngest.createFunction(
 
       // Step 4: Update task to approved
       await step.run('finalize-approval', async () => {
-        const transition = getApprovalTransition(gateName)
-        await updateTaskStatus(taskId, transition.nextStatus, transition.nextProgress)
-        await setTaskGate(taskId, transition.nextGate)
-
-        await appendLog(
+        await applyApprovedGateTransition({
           taskId,
-          'gate-processor',
-          `Gate ${gateName} approved by ${approval.data.approvedBy}. ${transition.logMessage}. Answers: ${JSON.stringify(approval.data.answers)}`
-        )
+          gateName,
+          actor: 'gate-processor',
+          approvedBy: approval.data.approvedBy,
+          answers: approval.data.answers,
+        })
       })
 
       return { status: 'approved', taskId, gateName, answers: approval.data.answers }
@@ -197,6 +196,20 @@ export const gateResponseHandler = inngest.createFunction(
     })
 
     if (parsed.decision === 'approve') {
+      const normalizedAnswers = normalizeApprovalAnswers(parsed.answers)
+      if (!areGateAnswersComplete(task.gate_current, normalizedAnswers)) {
+        await step.run('reject-incomplete-approval', async () => {
+          await appendLog(
+            task.id,
+            'gate-response-handler',
+            `Ignored incomplete approval response from ${event.data.author} for gate ${task.gate_current || 'unknown'}`,
+            'warn'
+          )
+        })
+
+        return { status: 'ignored-incomplete-approval', taskId: task.id }
+      }
+
       await step.run('record-approval', async () => {
         await createGateApproval({
           taskId: task.id,

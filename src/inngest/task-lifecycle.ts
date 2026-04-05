@@ -1,5 +1,11 @@
 import { inngest } from './client'
-import { updateTaskStatus, appendLog, createTask, getTaskByBranch, getTaskByIssueNumber, setTaskGate } from '@/lib/db'
+import { updateTaskStatus, appendLog, createTask, getTaskByBranch, getTaskByIssueNumber, getTaskLogs, setTaskGate } from '@/lib/db'
+import {
+  buildMergeApprovalContext,
+  getMergeApprovalReadiness,
+  serializeMergeApprovalContextLog,
+} from '@/lib/merge-approval'
+import { ensurePromotionTask } from '@/lib/promotion-task'
 
 /**
  * Task lifecycle handler: Manages all state transitions for AgentTask
@@ -155,7 +161,7 @@ export const ciCheckCompletedHandler = inngest.createFunction(
   { id: 'ci-check-completed-handler', concurrency: { limit: 5 } },
   { event: 'orchestration/ci.check_completed' },
   async ({ event, step }) => {
-    const { status, workflowName, headBranch, htmlUrl, repoOwner, repoName, installationId } = event.data
+    const { status, workflowName, headBranch, headSha, htmlUrl, repoOwner, repoName, installationId } = event.data
 
     const task = await step.run('find-task-by-branch', async () => getTaskByBranch(headBranch))
     if (!task) {
@@ -167,28 +173,74 @@ export const ciCheckCompletedHandler = inngest.createFunction(
     })
 
     if (status === 'success') {
-      if (task.gate_current === 'merge-approval' || task.status === 'awaiting_approval') {
-        return { status: 'already-awaiting-merge-approval', taskId: task.id }
-      }
+      const mergeApprovalContext = buildMergeApprovalContext({
+        taskId: task.id,
+        repoOwner,
+        repoName,
+        installationId,
+        prNumber: task.issue_number,
+        headSha,
+        workflowName,
+        htmlUrl,
+      })
 
-      await step.run('queue-merge-approval', async () => {
-        await updateTaskStatus(task.id, 'awaiting_approval', 85)
-        await setTaskGate(task.id, 'merge-approval')
-        await inngest.send({
-          name: 'orchestration/gate.awaiting_approval',
-          data: {
-            taskId: task.id,
-            gateName: 'merge-approval',
-            questionPackId: 'merge-approval',
-            repoOwner,
-            repoName,
-            prNumber: task.issue_number || undefined,
-            installationId,
-          },
+      await step.run('record-merge-approval-context', async () => {
+        await appendLog(task.id, 'ci-check-completed-handler', serializeMergeApprovalContextLog(mergeApprovalContext), 'debug')
+      })
+
+      const readiness = await step.run('evaluate-merge-readiness', async () => {
+        const logs = await getTaskLogs(task.id)
+        return getMergeApprovalReadiness({
+          task,
+          logs,
+          ciContext: mergeApprovalContext,
         })
       })
 
-      return { status: 'merge-approval-queued', taskId: task.id }
+      if (readiness.state === 'already-queued') {
+        return { status: 'already-awaiting-merge-approval', taskId: task.id }
+      }
+
+      if (readiness.state === 'ready') {
+        await step.run('queue-merge-approval', async () => {
+          await updateTaskStatus(task.id, 'awaiting_approval', 85)
+          await setTaskGate(task.id, 'merge-approval')
+          await appendLog(task.id, 'ci-check-completed-handler', 'CI success satisfied the final merge gate prerequisite; queued merge approval')
+          await inngest.send({
+            name: 'orchestration/gate.awaiting_approval',
+            data: {
+              taskId: task.id,
+              gateName: 'merge-approval',
+              questionPackId: 'merge-approval',
+              repoOwner: readiness.ciContext.repoOwner,
+              repoName: readiness.ciContext.repoName,
+              prNumber: readiness.ciContext.prNumber || undefined,
+              installationId: readiness.ciContext.installationId,
+            },
+          })
+        })
+
+        return { status: 'merge-approval-queued', taskId: task.id }
+      }
+
+      if (readiness.state === 'waiting-for-evidence') {
+        await step.run('log-waiting-for-evidence', async () => {
+          await appendLog(task.id, 'ci-check-completed-handler', 'CI passed; awaiting implementation evidence before opening merge approval')
+        })
+      }
+
+      if (readiness.state === 'waiting-for-current-sha') {
+        await step.run('log-waiting-for-current-sha', async () => {
+          const currentEvidence = readiness.implementationEvidence
+          await appendLog(
+            task.id,
+            'ci-check-completed-handler',
+            `CI passed for ${readiness.ciContext.headSha}, but implementation evidence is for ${currentEvidence?.headSha ?? 'the latest head SHA'}; awaiting CI for the current evidence SHA`,
+          )
+        })
+      }
+
+      return { status: readiness.state, taskId: task.id }
     }
 
     await step.run('mark-task-failed', async () => {
@@ -197,6 +249,45 @@ export const ciCheckCompletedHandler = inngest.createFunction(
     })
 
     return { status: 'task-failed', taskId: task.id }
+  }
+)
+
+export const promotionRequestedHandler = inngest.createFunction(
+  { id: 'promotion-requested-handler', concurrency: { limit: 3 } },
+  { event: 'orchestration/promotion.requested' },
+  async ({ event, step }) => {
+    const { prNumber, repoOwner, repoName, baseBranch, headBranch, title, htmlUrl, installationId } = event.data
+    const promotionTask = await step.run('ensure-promotion-task', async () =>
+      ensurePromotionTask({
+        prNumber,
+        title,
+        baseBranch,
+        headBranch,
+        htmlUrl,
+      })
+    )
+
+    await step.run('queue-promotion-gate', async () => {
+      await setTaskGate(promotionTask.task.id, 'promotion-approval')
+      await inngest.send({
+        name: 'orchestration/gate.awaiting_approval',
+        data: {
+          taskId: promotionTask.task.id,
+          gateName: 'promotion-approval',
+          questionPackId: 'promotion-approval',
+          repoOwner,
+          repoName,
+          prNumber,
+          installationId,
+        },
+      })
+    })
+
+    return {
+      status: promotionTask.created ? 'promotion-approval-created-and-queued' : 'promotion-approval-requeued',
+      taskId: promotionTask.task.id,
+      prNumber,
+    }
   }
 )
 

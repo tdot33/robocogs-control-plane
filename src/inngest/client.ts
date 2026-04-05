@@ -108,6 +108,19 @@ export type OrchestrationEvents = {
       htmlUrl: string
     }
   }
+  'orchestration/promotion.requested': {
+    data: {
+      prNumber: number
+      repo: string
+      repoOwner: string
+      repoName: string
+      baseBranch: string
+      headBranch: string
+      title: string
+      htmlUrl: string
+      installationId: number
+    }
+  }
   'orchestration/commit.traceability_failure': {
     data: {
       taskId: string

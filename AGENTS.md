@@ -185,6 +185,12 @@ npm run db:migrate   # Run DB migrations (requires Turso CLI)
 
 The `npm run lint` command invokes `next lint`. For new code, TypeScript strict mode applies; do not suppress compiler errors with `any` casts unless there is a clear type-boundary reason documented inline.
 
+## GitHub MCP Boundary
+
+- Use GitHub MCP as a read-optimized surface for linked issue/PR context, review state, and status-check inspection when that reduces manual GitHub lookup.
+- Keep orchestration writes on the existing control-plane path: GitHub App API calls, validated webhooks, Inngest events, and repository helper flows remain authoritative for lifecycle state changes.
+- Do not treat this repo knowledge entry point or the versioned `docs/ORCHESTRATION_V1_*` contracts as a place to redefine support-content or knowledge-base policy.
+
 ---
 
 ## Coding Conventions
@@ -215,6 +221,7 @@ This control plane integrates with the main `robocogs` repo:
 1. **Webhooks** — robocogs GitHub App delivers `check_suite`, `pull_request`, and `issue_comment` events here.
 2. **GitHub API** — This service posts gate-question comments and resolves approvals back to robocogs PRs/issues.
 3. **`work:start`** — The `npm run work:start` script in robocogs POSTs to `/api/orchestration/work-start` with the shared secret to register a new task.
+4. **`work:promote`** — The `npm run work:promote` script in robocogs can POST to `/api/orchestration/promotion-start` so promotion approval tasks appear immediately instead of waiting for follow-up PR webhook activity.
 
 ---
 

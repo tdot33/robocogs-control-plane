@@ -31,6 +31,48 @@ export interface ImplementationPackage {
 
 export const IMPLEMENTATION_PACKAGE_LOG_PREFIX = '[implementation-package] '
 
+export interface ImplementationEvidence {
+  version: number
+  submittedAt: string
+  taskId: string
+  gateName: 'implementation'
+  branch: string
+  prUrl: string
+  headSha: string
+  validationSummary: string
+  scopeSummary: string
+  rollbackNotes: string
+}
+
+export const IMPLEMENTATION_EVIDENCE_LOG_PREFIX = '[implementation-evidence] '
+
+export interface AuditorReviewPackage {
+  version: number
+  generatedAt: string
+  taskId: string
+  sourceGate: 'implementation'
+  summary: string
+  evidenceChecklist: string[]
+  reviewFocus: string[]
+  mergeCriteria: string[]
+  closeoutExpectations: string[]
+}
+
+export const AUDITOR_REVIEW_PACKAGE_LOG_PREFIX = '[auditor-review-package] '
+
+export interface PromotionPackage {
+  version: number
+  generatedAt: string
+  taskId: string
+  sourceGate: 'promotion-approval'
+  summary: string
+  releaseContext: string[]
+  founderChecklist: string[]
+  rollbackExpectations: string[]
+}
+
+export const PROMOTION_PACKAGE_LOG_PREFIX = '[promotion-package] '
+
 export function buildPlanPackage(input: {
   task: AgentTask
   answers: Record<string, string>
@@ -53,7 +95,7 @@ export function buildPlanPackage(input: {
     sourceGate: 'intake',
     summary: `Implementation package for ${task.task_name}. ${branchContext}`,
     objectives: [
-      `Implement the requested change for \"${task.task_name}\" with the smallest viable diff.`,
+      `Implement the requested change for "${task.task_name}" with the smallest viable diff.`,
       issueContext,
       'Preserve existing production behavior outside the approved scope.',
     ],
@@ -77,8 +119,12 @@ export function buildPlanPackage(input: {
       'Restore the last known-good behavior and record the blocking reason in the orchestration task.',
     ],
     riskNotes: [
-      scopeConfirmed ? 'Scope was explicitly confirmed during intake approval.' : 'Scope confirmation was not explicit; review the branch diff carefully before implementation.',
-      riskAccepted ? 'Risk posture was accepted during intake approval.' : 'Risk posture was not fully accepted during intake approval; require extra validation before merge.',
+      scopeConfirmed
+        ? 'Scope was explicitly confirmed during intake approval.'
+        : 'Scope confirmation was not explicit; review the branch diff carefully before implementation.',
+      riskAccepted
+        ? 'Risk posture was accepted during intake approval.'
+        : 'Risk posture was not fully accepted during intake approval; require extra validation before merge.',
       note ? `Intake note: ${note}` : 'No additional intake note was provided.',
     ],
   }
@@ -125,8 +171,12 @@ export function buildImplementationPackage(input: {
       'Request merge approval only after the work branch is pushed and validation evidence is attached.',
     ],
     riskNotes: [
-      planSound ? 'Plan approval confirmed the proposed implementation shape.' : 'Plan soundness was not explicitly confirmed; validate change shape before coding.',
-      rollbackReady ? 'Rollback strategy was confirmed at plan approval.' : 'Rollback strategy was not fully confirmed; document rollback details during implementation.',
+      planSound
+        ? 'Plan approval confirmed the proposed implementation shape.'
+        : 'Plan soundness was not explicitly confirmed; validate change shape before coding.',
+      rollbackReady
+        ? 'Rollback strategy was confirmed at plan approval.'
+        : 'Rollback strategy was not fully confirmed; document rollback details during implementation.',
       note ? `Plan approval note: ${note}` : 'No additional plan approval note was provided.',
     ],
   }
@@ -140,13 +190,228 @@ export function serializeImplementationPackageLog(implementationPackage: Impleme
   return `${IMPLEMENTATION_PACKAGE_LOG_PREFIX}${JSON.stringify(implementationPackage)}`
 }
 
+export function buildImplementationEvidence(input: {
+  taskId: string
+  branch: string | null
+  prUrl?: string
+  headSha: string
+  validationSummary: string
+  scopeSummary: string
+  rollbackNotes: string
+}): ImplementationEvidence {
+  return {
+    version: 1,
+    submittedAt: new Date().toISOString(),
+    taskId: input.taskId,
+    gateName: 'implementation',
+    branch: input.branch || '',
+    prUrl: (input.prUrl || '').trim(),
+    headSha: input.headSha.trim(),
+    validationSummary: input.validationSummary.trim(),
+    scopeSummary: input.scopeSummary.trim(),
+    rollbackNotes: input.rollbackNotes.trim(),
+  }
+}
+
+export function serializeImplementationEvidenceLog(implementationEvidence: ImplementationEvidence): string {
+  return `${IMPLEMENTATION_EVIDENCE_LOG_PREFIX}${JSON.stringify(implementationEvidence)}`
+}
+
+export function buildAuditorReviewPackage(input: {
+  task: AgentTask
+  implementationEvidence: ImplementationEvidence
+}): AuditorReviewPackage {
+  const { task, implementationEvidence } = input
+  const trackedBranch = implementationEvidence.branch || task.branch || 'the tracked work branch'
+
+  return {
+    version: 1,
+    generatedAt: new Date().toISOString(),
+    taskId: task.id,
+    sourceGate: 'implementation',
+    summary: `Auditor review package for ${task.task_name}. Review the evidence captured on ${trackedBranch} before merge approval is granted.`,
+    evidenceChecklist: [
+      implementationEvidence.prUrl
+        ? `PR prepared for review: ${implementationEvidence.prUrl}`
+        : 'PR URL was not supplied; confirm the review branch is available before merge approval.',
+      `Head SHA submitted for review: ${implementationEvidence.headSha}.`,
+      `Validation evidence captured: ${implementationEvidence.validationSummary}.`,
+      `Implemented scope summary captured: ${implementationEvidence.scopeSummary}.`,
+      `Rollback notes captured: ${implementationEvidence.rollbackNotes}.`,
+    ],
+    reviewFocus: [
+      'Confirm the submitted scope matches the approved implementation package and excludes unrelated changes.',
+      'Validate that the recorded evidence is sufficient for founder merge approval, not just local confidence.',
+      'Check branch state, PR readiness, and CI outcomes before advancing the task to merge review.',
+    ],
+    mergeCriteria: [
+      'Merge approval only opens after both CI success and implementation evidence are present.',
+      'Evidence package must remain current with the reviewed head SHA and PR state.',
+      'Escalate any scope or rollback gaps before founder merge approval is requested.',
+    ],
+    closeoutExpectations: [
+      'Keep the audit trail explicit in task logs so historian closeout is based on recorded evidence rather than inference.',
+      'Hand off to historian only after merge or final approval disposition is recorded.',
+    ],
+  }
+}
+
+export function serializeAuditorReviewPackageLog(auditorReviewPackage: AuditorReviewPackage): string {
+  return `${AUDITOR_REVIEW_PACKAGE_LOG_PREFIX}${JSON.stringify(auditorReviewPackage)}`
+}
+
+export function buildPromotionPackage(input: {
+  task: AgentTask
+  prNumber: number
+  baseBranch: string
+  headBranch: string
+  htmlUrl: string
+}): PromotionPackage {
+  const { task, prNumber, baseBranch, headBranch, htmlUrl } = input
+
+  return {
+    version: 1,
+    generatedAt: new Date().toISOString(),
+    taskId: task.id,
+    sourceGate: 'promotion-approval',
+    summary: `Promotion review for ${task.task_name}. Founder approval is required before promoting ${headBranch} into ${baseBranch}.`,
+    releaseContext: [
+      `Promotion PR #${prNumber} is the proposed path from ${headBranch} to ${baseBranch}.`,
+      `Review URL: ${htmlUrl}.`,
+      'This promotion task is separate from work-branch merge approval and exists to capture production-release intent explicitly.',
+    ],
+    founderChecklist: [
+      'Confirm staging or integration validation on the source branch is complete.',
+      'Confirm release CI status and any final release notes are acceptable for production promotion.',
+      'Confirm the production rollback path is still valid for the commits included in this promotion PR.',
+    ],
+    rollbackExpectations: [
+      `If promotion risk changes, hold or close the ${headBranch} -> ${baseBranch} PR rather than bypassing the gate.`,
+      'Record any production hold reason in orchestration logs so historian closeout has a complete release trail.',
+    ],
+  }
+}
+
+export function serializePromotionPackageLog(promotionPackage: PromotionPackage): string {
+  return `${PROMOTION_PACKAGE_LOG_PREFIX}${JSON.stringify(promotionPackage)}`
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function asString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback
+}
+
+function asNumber(value: unknown, fallback = 1): number {
+  return typeof value === 'number' ? value : fallback
+}
+
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+}
+
+function normalizePlanPackage(value: unknown): PlanPackage | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  return {
+    version: asNumber(value.version),
+    generatedAt: asString(value.generatedAt),
+    taskId: asString(value.taskId),
+    sourceGate: asString(value.sourceGate, 'intake'),
+    summary: asString(value.summary),
+    objectives: asStringArray(value.objectives),
+    executionPolicy: asStringArray(value.executionPolicy),
+    implementationSteps: asStringArray(value.implementationSteps),
+    validationSteps: asStringArray(value.validationSteps),
+    rollbackSteps: asStringArray(value.rollbackSteps),
+    riskNotes: asStringArray(value.riskNotes),
+  }
+}
+
+function normalizeImplementationPackage(value: unknown): ImplementationPackage | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  return {
+    version: asNumber(value.version),
+    generatedAt: asString(value.generatedAt),
+    taskId: asString(value.taskId),
+    sourceGate: asString(value.sourceGate, 'plan-approval'),
+    summary: asString(value.summary),
+    executionPolicy: asStringArray(value.executionPolicy),
+    implementationChecklist: asStringArray(value.implementationChecklist),
+    validationSteps: asStringArray(value.validationSteps),
+    mergePolicy: asStringArray(value.mergePolicy),
+    riskNotes: asStringArray(value.riskNotes),
+  }
+}
+
+function normalizeImplementationEvidence(value: unknown): ImplementationEvidence | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  return {
+    version: asNumber(value.version),
+    submittedAt: asString(value.submittedAt),
+    taskId: asString(value.taskId),
+    gateName: 'implementation',
+    branch: asString(value.branch),
+    prUrl: asString(value.prUrl),
+    headSha: asString(value.headSha),
+    validationSummary: asString(value.validationSummary),
+    scopeSummary: asString(value.scopeSummary),
+    rollbackNotes: asString(value.rollbackNotes),
+  }
+}
+
+function normalizeAuditorReviewPackage(value: unknown): AuditorReviewPackage | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  return {
+    version: asNumber(value.version),
+    generatedAt: asString(value.generatedAt),
+    taskId: asString(value.taskId),
+    sourceGate: 'implementation',
+    summary: asString(value.summary),
+    evidenceChecklist: asStringArray(value.evidenceChecklist),
+    reviewFocus: asStringArray(value.reviewFocus),
+    mergeCriteria: asStringArray(value.mergeCriteria),
+    closeoutExpectations: asStringArray(value.closeoutExpectations),
+  }
+}
+
+function normalizePromotionPackage(value: unknown): PromotionPackage | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  return {
+    version: asNumber(value.version),
+    generatedAt: asString(value.generatedAt),
+    taskId: asString(value.taskId),
+    sourceGate: 'promotion-approval',
+    summary: asString(value.summary),
+    releaseContext: asStringArray(value.releaseContext),
+    founderChecklist: asStringArray(value.founderChecklist),
+    rollbackExpectations: asStringArray(value.rollbackExpectations),
+  }
+}
+
 export function parsePlanPackageLog(message: string): PlanPackage | null {
   if (!message.startsWith(PLAN_PACKAGE_LOG_PREFIX)) {
     return null
   }
 
   try {
-    return JSON.parse(message.slice(PLAN_PACKAGE_LOG_PREFIX.length)) as PlanPackage
+    return normalizePlanPackage(JSON.parse(message.slice(PLAN_PACKAGE_LOG_PREFIX.length)))
   } catch {
     return null
   }
@@ -158,7 +423,43 @@ export function parseImplementationPackageLog(message: string): ImplementationPa
   }
 
   try {
-    return JSON.parse(message.slice(IMPLEMENTATION_PACKAGE_LOG_PREFIX.length)) as ImplementationPackage
+    return normalizeImplementationPackage(JSON.parse(message.slice(IMPLEMENTATION_PACKAGE_LOG_PREFIX.length)))
+  } catch {
+    return null
+  }
+}
+
+export function parseImplementationEvidenceLog(message: string): ImplementationEvidence | null {
+  if (!message.startsWith(IMPLEMENTATION_EVIDENCE_LOG_PREFIX)) {
+    return null
+  }
+
+  try {
+    return normalizeImplementationEvidence(JSON.parse(message.slice(IMPLEMENTATION_EVIDENCE_LOG_PREFIX.length)))
+  } catch {
+    return null
+  }
+}
+
+export function parseAuditorReviewPackageLog(message: string): AuditorReviewPackage | null {
+  if (!message.startsWith(AUDITOR_REVIEW_PACKAGE_LOG_PREFIX)) {
+    return null
+  }
+
+  try {
+    return normalizeAuditorReviewPackage(JSON.parse(message.slice(AUDITOR_REVIEW_PACKAGE_LOG_PREFIX.length)))
+  } catch {
+    return null
+  }
+}
+
+export function parsePromotionPackageLog(message: string): PromotionPackage | null {
+  if (!message.startsWith(PROMOTION_PACKAGE_LOG_PREFIX)) {
+    return null
+  }
+
+  try {
+    return normalizePromotionPackage(JSON.parse(message.slice(PROMOTION_PACKAGE_LOG_PREFIX.length)))
   } catch {
     return null
   }
