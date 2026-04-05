@@ -1,6 +1,8 @@
 import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { appendLog, getTaskByBranch } from '@/lib/db'
+import { setTaskGate } from '@/lib/db'
+import { getRepoInstallationId } from '@/lib/github'
+import { ensurePromotionTask } from '@/lib/promotion-task'
 import { inngest } from '@/inngest/client'
 
 interface PromotionStartPayload {
@@ -43,33 +45,41 @@ export async function POST(request: NextRequest) {
   const htmlUrl = String(body.htmlUrl || '').trim()
   const repoOwner = String(body.repoOwner || '').trim()
   const repoName = String(body.repoName || '').trim()
-  const installationId = Number(await request.headers.get('x-installation-id') || 0)
+  let installationId = Number(request.headers.get('x-installation-id') || 0)
 
   if (!prNumber || !title || !baseBranch || !headBranch || !repoOwner || !repoName) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  const promotionBranchKey = `promotion:${headBranch}->${baseBranch}#${prNumber}`
-  const existingTask = await getTaskByBranch(promotionBranchKey)
-  if (existingTask) {
-    await appendLog(existingTask.id, 'promotion-start-intake', `Observed direct promotion handoff for PR #${prNumber}`)
-    return NextResponse.json({ ok: true, taskId: existingTask.id, created: false })
+  if (!installationId) {
+    try {
+      installationId = await getRepoInstallationId(repoOwner, repoName)
+    } catch {
+      installationId = 0
+    }
   }
 
+  const { task, created } = await ensurePromotionTask({
+    prNumber,
+    title,
+    baseBranch,
+    headBranch,
+    htmlUrl,
+  })
+
+  await setTaskGate(task.id, 'promotion-approval')
   await inngest.send({
-    name: 'orchestration/promotion.requested',
+    name: 'orchestration/gate.awaiting_approval',
     data: {
-      prNumber,
-      repo: `${repoOwner}/${repoName}`,
+      taskId: task.id,
+      gateName: 'promotion-approval',
+      questionPackId: 'promotion-approval',
       repoOwner,
       repoName,
-      baseBranch,
-      headBranch,
-      title,
-      htmlUrl,
+      prNumber,
       installationId,
     },
   })
 
-  return NextResponse.json({ ok: true, taskId: `promotion-pr-${prNumber}`, created: true })
+  return NextResponse.json({ ok: true, taskId: task.id, created })
 }

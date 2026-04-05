@@ -5,7 +5,7 @@ import {
   getMergeApprovalReadiness,
   serializeMergeApprovalContextLog,
 } from '@/lib/merge-approval'
-import { buildPromotionPackage, serializePromotionPackageLog } from '@/lib/plan-package'
+import { ensurePromotionTask } from '@/lib/promotion-task'
 
 /**
  * Task lifecycle handler: Manages all state transitions for AgentTask
@@ -246,54 +246,22 @@ export const promotionRequestedHandler = inngest.createFunction(
   { event: 'orchestration/promotion.requested' },
   async ({ event, step }) => {
     const { prNumber, repoOwner, repoName, baseBranch, headBranch, title, htmlUrl, installationId } = event.data
-    const promotionBranchKey = `promotion:${headBranch}->${baseBranch}#${prNumber}`
-
-    const existingTask = await step.run('find-existing-promotion-task', async () => getTaskByBranch(promotionBranchKey))
-    if (existingTask) {
-      await step.run('log-existing-promotion-task', async () => {
-        await appendLog(existingTask.id, 'promotion-requested-handler', `Observed promotion PR #${prNumber}: ${htmlUrl}`)
+    const promotionTask = await step.run('ensure-promotion-task', async () =>
+      ensurePromotionTask({
+        prNumber,
+        title,
+        baseBranch,
+        headBranch,
+        htmlUrl,
       })
-
-      if (existingTask.gate_current === 'promotion-approval' || existingTask.gate_current === 'done') {
-        return { status: 'promotion-task-reused', taskId: existingTask.id, prNumber }
-      }
-    }
-
-    const task =
-      existingTask ||
-      (await step.run('create-promotion-task', async () => {
-        const taskId = `promotion-pr-${prNumber}`
-        const created = await createTask({
-          id: taskId,
-          task_name: title,
-          assigned_agent: 'historian',
-          status: 'awaiting_approval',
-          progress: 92,
-          branch: promotionBranchKey,
-          issue_number: null,
-          scope_slice: null,
-          gate_current: 'promotion-approval',
-        })
-
-        const promotionPackage = buildPromotionPackage({
-          task: created,
-          prNumber,
-          baseBranch,
-          headBranch,
-          htmlUrl,
-        })
-
-        await appendLog(taskId, 'promotion-requested-handler', `Created promotion approval task from PR #${prNumber}`)
-        await appendLog(taskId, 'promotion-requested-handler', serializePromotionPackageLog(promotionPackage), 'debug')
-        return created
-      }))
+    )
 
     await step.run('queue-promotion-gate', async () => {
-      await setTaskGate(task.id, 'promotion-approval')
+      await setTaskGate(promotionTask.task.id, 'promotion-approval')
       await inngest.send({
         name: 'orchestration/gate.awaiting_approval',
         data: {
-          taskId: task.id,
+          taskId: promotionTask.task.id,
           gateName: 'promotion-approval',
           questionPackId: 'promotion-approval',
           repoOwner,
@@ -304,7 +272,11 @@ export const promotionRequestedHandler = inngest.createFunction(
       })
     })
 
-    return { status: 'promotion-approval-queued', taskId: task.id, prNumber }
+    return {
+      status: promotionTask.created ? 'promotion-approval-created-and-queued' : 'promotion-approval-requeued',
+      taskId: promotionTask.task.id,
+      prNumber,
+    }
   }
 )
 
