@@ -5,7 +5,13 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import type { TaskData } from './agent-tasks-table'
 import { areGateAnswersComplete, getGatePack, getGateTimelineState } from '@/lib/gates'
-import type { AuditorReviewPackage, ImplementationEvidence, ImplementationPackage, PlanPackage, PromotionPackage } from '@/lib/plan-package'
+import type {
+  AuditorReviewPackage,
+  ImplementationEvidence,
+  ImplementationPackage,
+  PlanPackage,
+  PromotionPackage,
+} from '@/lib/plan-package'
 
 interface TaskReviewDrawerProps {
   task: TaskData
@@ -227,19 +233,16 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
 
   return createPortal(
     <>
-      {/* Overlay */}
       {isOpen && (
         <div className="fixed inset-0 z-40 bg-black/55 backdrop-blur-[1px]" onClick={onClose} />
       )}
 
-      {/* Drawer */}
       <div
         className={`fixed right-0 top-0 z-50 h-full w-full border-l border-[#30363d] bg-[#161b22] shadow-2xl shadow-black/30 transition-transform duration-300 ease-out md:w-96 ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         <div className="h-full flex flex-col">
-          {/* Header */}
           <div className="flex items-center justify-between border-b border-[#30363d] p-6">
             <div>
               <h2 className="text-lg font-bold text-white">Review</h2>
@@ -250,9 +253,7 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
             </button>
           </div>
 
-          {/* Content */}
           <div className="flex-1 overflow-y-auto">
-            {/* Task Info */}
             <div className="border-b border-[#30363d] p-6">
               <div className="mb-4">
                 <p className="text-xs font-semibold uppercase text-slate-400">Task</p>
@@ -280,7 +281,6 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
               )}
             </div>
 
-            {/* Gate Status */}
             <div className="border-b border-[#30363d] p-6">
               <h3 className="mb-3 font-semibold text-white">Gate Status</h3>
               <div className="space-y-2">
@@ -299,6 +299,13 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
                 })}
               </div>
             </div>
+
+            {planPackage?.executionPolicy?.length ? (
+              <div className="border-b border-[#30363d] p-6">
+                <h3 className="mb-3 font-semibold text-white">Execution Policy</h3>
+                <PlanList title="Branch And Merge Policy" items={planPackage.executionPolicy} />
+              </div>
+            ) : null}
 
             {planPackage ? (
               <div className="border-b border-[#30363d] p-6">
@@ -381,6 +388,7 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
                     <div key={question.id}>
                       <label className="mb-1 block text-sm font-medium text-slate-200">{question.label}</label>
                       <select
+                        aria-label={question.label}
                         value={gateAnswers[question.id] || ''}
                         onChange={(event) => {
                           setGateAnswers((current) => ({
@@ -409,7 +417,6 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
               </div>
             ) : null}
 
-            {/* Logs */}
             <div className="p-6">
               <h3 className="mb-3 font-semibold text-white">Activity Logs</h3>
               {errorMessage ? (
@@ -439,6 +446,7 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
                 Use these admin-safe actions to rebuild missing packages or normalize a task that predates the current orchestration flow.
               </p>
               <select
+                aria-label="Repair action"
                 value={repairAction}
                 onChange={(event) => setRepairAction(event.target.value)}
                 className="w-full rounded-md border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-[#c9d1d9] focus:outline-none focus:ring-2 focus:ring-[#1f6feb]"
@@ -462,7 +470,6 @@ export function TaskReviewDrawer({ task, isOpen, onClose }: TaskReviewDrawerProp
             </div>
           </div>
 
-          {/* Footer */}
           <div className="border-t border-[#30363d] bg-[#161b22] p-6">
             {gateName === 'implementation' ? (
               <>

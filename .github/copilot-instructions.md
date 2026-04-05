@@ -75,12 +75,16 @@ Tasks move through gates in order: `intake → plan-approval → implementation 
 
 Before writing any code:
 1. Confirm the task is within the approved gate scope.
-2. Make the **smallest possible diff** — prefer targeted edits over rewrites.
-3. For concurrent local work, bootstrap the branch from the clean base checkout and move implementation into a dedicated git worktree rather than reusing a checkout with unrelated changes.
-4. Treat git worktrees as local isolation only; if the requested change overlaps a shared contract, gate, or migration path, escalate instead of assuming parallel work is safe.
-5. Prefer `npm run worktree:add -- --branch=<name>` when creating a new control-plane worktree; if the worktree already exists, run `npm run worktree:bootstrap` there before implementation so dependencies and local env expectations are checked against the active lockfile.
-6. After any change to API routes, Inngest functions, or database helpers, run `npm run build` to confirm no TypeScript errors.
-7. Do not modify `db/migrations/001_initial.sql`. Add a new numbered migration file for schema changes.
+2. For any issue-scoped task, verify that the active repository, branch, and worktree match the intended task checkout before editing files.
+3. If the active branch or worktree is unrelated to the task, stop and move implementation into the intended isolated checkout instead of editing in place.
+4. Do not reuse an unrelated branch or non-isolated checkout unless the user explicitly instructs reuse of the current checkout.
+5. In multi-repo or shifting-context sessions, re-verify the active repository, branch, and worktree immediately before each edit batch.
+6. Make the **smallest possible diff** — prefer targeted edits over rewrites.
+7. For concurrent local work, bootstrap the branch from the clean base checkout and move implementation into a dedicated git worktree rather than reusing a checkout with unrelated changes.
+8. Treat git worktrees as local isolation only; if the requested change overlaps a shared contract, gate, or migration path, escalate instead of assuming parallel work is safe.
+9. Prefer `npm run worktree:add -- --branch=<name>` when creating a new control-plane worktree; if the worktree already exists, run `npm run worktree:bootstrap` there before implementation so dependencies and local env expectations are checked against the active lockfile.
+10. After any change to API routes, Inngest functions, or database helpers, run `npm run build` to confirm no TypeScript errors.
+11. Do not modify `db/migrations/001_initial.sql`. Add a new numbered migration file for schema changes.
 
 ## GitHub MCP usage
 
