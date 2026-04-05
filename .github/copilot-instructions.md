@@ -78,7 +78,7 @@ Before writing any code:
 2. Make the **smallest possible diff** — prefer targeted edits over rewrites.
 3. For concurrent local work, bootstrap the branch from the clean base checkout and move implementation into a dedicated git worktree rather than reusing a checkout with unrelated changes.
 4. Treat git worktrees as local isolation only; if the requested change overlaps a shared contract, gate, or migration path, escalate instead of assuming parallel work is safe.
-5. After attaching a control-plane branch to a git worktree, run `npm run worktree:bootstrap` there before implementation so dependencies and local env expectations are checked against the active lockfile.
+5. Prefer `npm run worktree:add -- --branch=<name>` when creating a new control-plane worktree; if the worktree already exists, run `npm run worktree:bootstrap` there before implementation so dependencies and local env expectations are checked against the active lockfile.
 6. After any change to API routes, Inngest functions, or database helpers, run `npm run build` to confirm no TypeScript errors.
 7. Do not modify `db/migrations/001_initial.sql`. Add a new numbered migration file for schema changes.
 
