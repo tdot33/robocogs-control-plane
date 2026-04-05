@@ -20,6 +20,10 @@ interface AgentTasksTableProps {
   tasks: TaskData[]
 }
 
+function getProgressLabel(task: TaskData) {
+  return `${task.task_name} progress: ${task.progress}%`
+}
+
 const statusColors: Record<string, { bg: string; text: string; badge: string }> = {
   pending: { bg: 'bg-[#161b22]', text: 'text-[#c9d1d9]', badge: 'bg-[#21262d] text-[#c9d1d9] ring-1 ring-[#30363d]' },
   running: { bg: 'bg-[#111d2e]', text: 'text-[#79c0ff]', badge: 'bg-[#1f6feb]/15 text-[#79c0ff] ring-1 ring-[#1f6feb]/30' },
@@ -82,9 +86,14 @@ export function AgentTasksTable({ tasks }: AgentTasksTableProps) {
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <div className="h-2 w-full rounded-full bg-[#0d1117]">
-                    <div className="h-2 rounded-full bg-[#1f6feb]" style={{ width: `${task.progress}%` }} />
-                  </div>
+                  <progress
+                    className="task-progress-bar"
+                    value={task.progress}
+                    max={100}
+                    aria-label={getProgressLabel(task)}
+                  >
+                    {task.progress}%
+                  </progress>
                   <span className="mt-1 block text-xs text-slate-400">{task.progress}%</span>
                 </td>
                 <td className="px-4 py-3 text-slate-400">{task.branch || '-'}</td>
@@ -127,9 +136,14 @@ export function AgentTasksTable({ tasks }: AgentTasksTableProps) {
             </div>
             <div className="mb-3">
               <p className="mb-1 text-xs text-slate-400">Progress</p>
-              <div className="h-2 w-full rounded-full bg-[#0d1117]">
-                <div className="h-2 rounded-full bg-[#1f6feb]" style={{ width: `${task.progress}%` }} />
-              </div>
+              <progress
+                className="task-progress-bar"
+                value={task.progress}
+                max={100}
+                aria-label={getProgressLabel(task)}
+              >
+                {task.progress}%
+              </progress>
               <p className="mt-1 text-xs text-slate-400">{task.progress}%</p>
             </div>
             <button

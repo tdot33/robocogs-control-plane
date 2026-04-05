@@ -2,6 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+.task-progress-bar {
+  width: 100%;
+  height: 0.5rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: 9999px;
+  background-color: #0d1117;
+  color: #1f6feb;
+}
+
+.task-progress-bar::-webkit-progress-bar {
+  background-color: #0d1117;
+}
+
+.task-progress-bar::-webkit-progress-value {
+  border-radius: 9999px;
+  background-color: #1f6feb;
+}
+
+.task-progress-bar::-moz-progress-bar {
+  border-radius: 9999px;
+  background-color: #1f6feb;
+}
+
 * {
   @apply scroll-smooth;
 }
