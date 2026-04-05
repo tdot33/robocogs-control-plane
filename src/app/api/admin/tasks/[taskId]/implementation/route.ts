@@ -95,6 +95,13 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ta
     })
   } else if (readiness.state === 'waiting-for-ci') {
     await appendLog(taskId, 'implementer', 'Implementation evidence recorded; awaiting CI success before opening merge approval')
+  } else if (readiness.state === 'waiting-for-current-sha') {
+    const currentEvidence = readiness.implementationEvidence
+    await appendLog(
+      taskId,
+      'implementer',
+      `Implementation evidence recorded for ${currentEvidence?.headSha ?? 'the latest head SHA'}; awaiting CI success for that same head SHA before opening merge approval`,
+    )
   }
 
   return NextResponse.json({ ok: true, taskId, evidence, auditorReviewPackage })

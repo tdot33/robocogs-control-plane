@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import type { AgentTask } from '../src/lib/db'
 import { getGateTimelineState } from '../src/lib/gates'
+import { validateTaskIssueBranchPair } from '../src/lib/traceability'
 import {
   buildMergeApprovalContext,
   getMergeApprovalReadiness,
@@ -117,6 +118,24 @@ test('merge approval readiness requires both CI context and implementation evide
     'waiting-for-evidence',
   )
 
+  const mismatchedReadiness = getMergeApprovalReadiness({
+    task,
+    logs: [{ message: serializeMergeApprovalContextLog(ciContext) }, {
+      message: serializeImplementationEvidenceLog(
+        buildImplementationEvidence({
+          taskId: task.id,
+          branch: task.branch,
+          headSha: 'fff999eee888',
+          validationSummary: 'npm run build passed',
+          scopeSummary: 'Scope matched approved package.',
+          rollbackNotes: 'Revert the branch PR.',
+        }),
+      ),
+    }],
+  })
+
+  assert.equal(mismatchedReadiness.state, 'waiting-for-current-sha')
+
   const readiness = getMergeApprovalReadiness({
     task,
     logs: [{ message: serializeMergeApprovalContextLog(ciContext) }, { message: evidenceLog }],
@@ -135,4 +154,13 @@ test('gate timeline includes promotion approval as the final explicit gate', () 
   assert.equal(timeline['implementation'], 'complete')
   assert.equal(timeline['merge-approval'], 'complete')
   assert.equal(timeline['promotion-approval'], 'active')
+})
+
+test('plan-approval traceability validation rejects mismatched issue and branch pairs', () => {
+  const valid = validateTaskIssueBranchPair('fix/364-correct-ci-push-base-resolution', 364)
+  const mismatch = validateTaskIssueBranchPair('fix/364-correct-ci-push-base-resolution', 365)
+
+  assert.equal(valid.status, 'valid')
+  assert.equal(mismatch.status, 'mismatch')
+  assert.match(mismatch.message, /issue #364/)
 })

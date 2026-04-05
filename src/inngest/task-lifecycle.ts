@@ -229,6 +229,17 @@ export const ciCheckCompletedHandler = inngest.createFunction(
         })
       }
 
+      if (readiness.state === 'waiting-for-current-sha') {
+        await step.run('log-waiting-for-current-sha', async () => {
+          const currentEvidence = readiness.implementationEvidence
+          await appendLog(
+            task.id,
+            'ci-check-completed-handler',
+            `CI passed for ${readiness.ciContext.headSha}, but implementation evidence is for ${currentEvidence?.headSha ?? 'the latest head SHA'}; awaiting CI for the current evidence SHA`,
+          )
+        })
+      }
+
       return { status: readiness.state, taskId: task.id }
     }
 

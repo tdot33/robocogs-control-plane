@@ -1,5 +1,5 @@
 import type { AgentTask } from './db'
-import { parseImplementationEvidenceLog } from './plan-package'
+import { parseImplementationEvidenceLog, type ImplementationEvidence } from './plan-package'
 
 export interface MergeApprovalContext {
   version: number
@@ -99,6 +99,17 @@ export function hasImplementationEvidence(logs: Array<{ message: string }>): boo
   return logs.some((log) => Boolean(parseImplementationEvidenceLog(log.message)))
 }
 
+export function findLatestImplementationEvidence(logs: Array<{ message: string }>): ImplementationEvidence | null {
+  for (const log of logs) {
+    const evidence = parseImplementationEvidenceLog(log.message)
+    if (evidence) {
+      return evidence
+    }
+  }
+
+  return null
+}
+
 export function getMergeApprovalReadiness(input: {
   task: AgentTask
   logs: Array<{ message: string }>
@@ -119,7 +130,8 @@ export function getMergeApprovalReadiness(input: {
   }
 
   const ciContext = input.ciContext ?? findLatestMergeApprovalContext(logs)
-  const implementationEvidencePresent = hasImplementationEvidence(logs)
+  const implementationEvidence = findLatestImplementationEvidence(logs)
+  const implementationEvidencePresent = Boolean(implementationEvidence)
 
   if (!ciContext && !implementationEvidencePresent) {
     return { state: 'waiting-for-ci-and-evidence' as const }
@@ -133,8 +145,17 @@ export function getMergeApprovalReadiness(input: {
     return { state: 'waiting-for-evidence' as const }
   }
 
+  if (implementationEvidence?.headSha !== ciContext.headSha) {
+    return {
+      state: 'waiting-for-current-sha' as const,
+      ciContext,
+      implementationEvidence,
+    }
+  }
+
   return {
     state: 'ready' as const,
     ciContext,
+    implementationEvidence,
   }
 }

@@ -4,6 +4,7 @@ import { ADMIN_SESSION_COOKIE, isAdminSessionValid } from '@/lib/admin-auth'
 import { appendLog, createGateApproval, getTaskById, setTaskGate, updateTaskStatus } from '@/lib/db'
 import { areGateAnswersComplete } from '@/lib/gates'
 import { applyApprovedGateTransition } from '@/lib/gate-approval-flow'
+import { validateTaskIssueBranchPair } from '@/lib/traceability'
 
 interface DecisionBody {
   decision?: 'approve' | 'reject'
@@ -45,6 +46,13 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ta
   if (decision === 'approve') {
     if (!areGateAnswersComplete(gateName, answers)) {
       return NextResponse.json({ error: 'All gate questions must be answered before approval' }, { status: 400 })
+    }
+
+    if (gateName === 'plan-approval') {
+      const traceability = validateTaskIssueBranchPair(task.branch, task.issue_number)
+      if (traceability.status !== 'valid' && traceability.status !== 'not-required') {
+        return NextResponse.json({ error: traceability.message }, { status: 409 })
+      }
     }
 
     const approvalAnswers: Record<string, string | boolean> = {
