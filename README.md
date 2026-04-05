@@ -88,6 +88,22 @@ turso db shell robocogs-orchestration < db/migrations/001_initial.sql
 npm install
 ```
 
+For a dedicated git worktree, prefer:
+
+```bash
+npm run worktree:bootstrap
+```
+
+That command runs `npm ci --prefer-offline` when the worktree is missing dependencies or the lockfile/runtime changed, and it reports missing `.env.local` or `.env` files before you start local orchestration work.
+
+To create and bootstrap a control-plane worktree in one step, use:
+
+```bash
+npm run worktree:add -- --branch=chore/123-control-plane-task
+```
+
+That command derives a sibling `../worktrees/...` path from the branch name, attaches the branch there, and immediately runs `npm run worktree:bootstrap` in the new worktree.
+
 ### 5. Run Development Server
 
 ```bash

@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "worktree:add": "node scripts/worktree-add.mjs",
+    "worktree:bootstrap": "node scripts/worktree-bootstrap.mjs",
     "db:migrate": "node scripts/migrate.js",
     "test": "tsx --test tests/**/*.test.ts"
   },
