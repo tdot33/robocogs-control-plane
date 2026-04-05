@@ -88,6 +88,14 @@ turso db shell robocogs-orchestration < db/migrations/001_initial.sql
 npm install
 ```
 
+For a dedicated git worktree, prefer:
+
+```bash
+npm run worktree:bootstrap
+```
+
+That command runs `npm ci --prefer-offline` when the worktree is missing dependencies or the lockfile/runtime changed, and it reports missing `.env.local` or `.env` files before you start local orchestration work.
+
 ### 5. Run Development Server
 
 ```bash

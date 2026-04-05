@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "worktree:bootstrap": "node scripts/worktree-bootstrap.mjs",
     "db:migrate": "node scripts/migrate.js"
   },
   "dependencies": {
