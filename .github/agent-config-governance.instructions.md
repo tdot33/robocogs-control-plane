@@ -50,6 +50,10 @@ Apply these rules whenever defining or updating shared or repository-level agent
 - Avoid destructive git recommendations unless explicitly approved.
 - Prefer a separate git worktree for concurrent issue-scoped sessions or when unrelated local changes must remain untouched.
 - Treat git worktrees as workspace isolation only; if scope ownership or shared contracts overlap, escalate instead of parallelizing blindly.
+- Before editing files for any issue-scoped task, verify that the active repository, branch, and worktree match the intended task checkout.
+- If the active branch or worktree is unrelated to the task, stop and switch to the intended isolated checkout instead of editing in place.
+- Do not reuse an unrelated branch or non-isolated checkout unless the user explicitly instructs that reuse.
+- In multi-repo or shifting-context sessions, re-verify the active repository, branch, and worktree immediately before each edit batch.
 
 ## Scope Control
 
