@@ -221,6 +221,7 @@ This control plane integrates with the main `robocogs` repo:
 1. **Webhooks** — robocogs GitHub App delivers `check_suite`, `pull_request`, and `issue_comment` events here.
 2. **GitHub API** — This service posts gate-question comments and resolves approvals back to robocogs PRs/issues.
 3. **`work:start`** — The `npm run work:start` script in robocogs POSTs to `/api/orchestration/work-start` with the shared secret to register a new task.
+4. **`work:promote`** — The `npm run work:promote` script in robocogs can POST to `/api/orchestration/promotion-start` so promotion approval tasks appear immediately instead of waiting for follow-up PR webhook activity.
 
 ---
 

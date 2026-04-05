@@ -3,10 +3,18 @@ import { cookies } from 'next/headers'
 import { ADMIN_SESSION_COOKIE, isAdminSessionValid } from '@/lib/admin-auth'
 import { getLatestGateApproval, getTaskById, getTaskLogs } from '@/lib/db'
 import {
+  buildAuditorReviewPackage,
   buildImplementationPackage,
+  buildPromotionPackage,
+  parseImplementationEvidenceLog,
+  parseAuditorReviewPackageLog,
   buildPlanPackage,
+  type AuditorReviewPackage,
+  type ImplementationEvidence,
   parseImplementationPackageLog,
   parsePlanPackageLog,
+  parsePromotionPackageLog,
+  type PromotionPackage,
 } from '@/lib/plan-package'
 
 interface LogPayload {
@@ -51,6 +59,39 @@ function extractImplementationPackage(logs: LogPayload[]) {
     const implementationPackage = parseImplementationPackageLog(log.message)
     if (implementationPackage) {
       return implementationPackage
+    }
+  }
+
+  return null
+}
+
+function extractImplementationEvidence(logs: LogPayload[]): ImplementationEvidence | null {
+  for (const log of logs) {
+    const implementationEvidence = parseImplementationEvidenceLog(log.message)
+    if (implementationEvidence) {
+      return implementationEvidence
+    }
+  }
+
+  return null
+}
+
+function extractAuditorReviewPackage(logs: LogPayload[]): AuditorReviewPackage | null {
+  for (const log of logs) {
+    const auditorReviewPackage = parseAuditorReviewPackageLog(log.message)
+    if (auditorReviewPackage) {
+      return auditorReviewPackage
+    }
+  }
+
+  return null
+}
+
+function extractPromotionPackage(logs: LogPayload[]): PromotionPackage | null {
+  for (const log of logs) {
+    const promotionPackage = parsePromotionPackageLog(log.message)
+    if (promotionPackage) {
+      return promotionPackage
     }
   }
 
@@ -115,6 +156,50 @@ async function loadImplementationPackage(taskId: string, logs: LogPayload[]) {
   return buildImplementationPackage({ task, answers, note })
 }
 
+async function loadAuditorReviewPackage(taskId: string, logs: LogPayload[]) {
+  const loggedAuditorReviewPackage = extractAuditorReviewPackage(logs)
+  if (loggedAuditorReviewPackage) {
+    return loggedAuditorReviewPackage
+  }
+
+  const task = await getTaskById(taskId)
+  if (!task || !task.gate_current || !['implementation', 'merge-approval', 'promotion-approval', 'done'].includes(task.gate_current)) {
+    return null
+  }
+
+  const implementationEvidence = extractImplementationEvidence(logs)
+  if (!implementationEvidence) {
+    return null
+  }
+
+  return buildAuditorReviewPackage({ task, implementationEvidence })
+}
+
+async function loadPromotionPackage(taskId: string, logs: LogPayload[]) {
+  const loggedPromotionPackage = extractPromotionPackage(logs)
+  if (loggedPromotionPackage) {
+    return loggedPromotionPackage
+  }
+
+  const task = await getTaskById(taskId)
+  if (!task || task.gate_current !== 'promotion-approval' || !task.branch?.startsWith('promotion:')) {
+    return null
+  }
+
+  const match = task.branch.match(/^promotion:(.+)->(.+)#(\d+)$/)
+  if (!match) {
+    return null
+  }
+
+  return buildPromotionPackage({
+    task,
+    headBranch: match[1],
+    baseBranch: match[2],
+    prNumber: Number(match[3]),
+    htmlUrl: 'Promotion PR URL recorded in activity logs.',
+  })
+}
+
 export async function GET(_request: NextRequest, context: { params: Promise<{ taskId: string }> }) {
   const cookieStore = await cookies()
   const sessionCookie = cookieStore.get(ADMIN_SESSION_COOKIE)?.value
@@ -130,11 +215,19 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ ta
 
   const logs = await getTaskLogs(taskId)
   const filteredLogs = filterSupersededLogs(logs as LogPayload[]).filter(
-    (log) => !parsePlanPackageLog(log.message) && !parseImplementationPackageLog(log.message)
+    (log) =>
+      !parsePlanPackageLog(log.message) &&
+      !parseImplementationPackageLog(log.message) &&
+      !parseImplementationEvidenceLog(log.message) &&
+      !parseAuditorReviewPackageLog(log.message) &&
+      !parsePromotionPackageLog(log.message)
   )
   return NextResponse.json({
     logs: filteredLogs,
     planPackage: await loadPlanPackage(taskId, logs as LogPayload[]),
     implementationPackage: await loadImplementationPackage(taskId, logs as LogPayload[]),
+    implementationEvidence: extractImplementationEvidence(logs as LogPayload[]),
+    auditorReviewPackage: await loadAuditorReviewPackage(taskId, logs as LogPayload[]),
+    promotionPackage: await loadPromotionPackage(taskId, logs as LogPayload[]),
   })
 }

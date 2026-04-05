@@ -111,7 +111,7 @@ export function getApprovalTransition(gateName: string | null | undefined): Gate
 }
 
 export function getGateTimelineState(currentGate: string | null | undefined, status: TaskStatus) {
-  const order = ['intake', 'plan-approval', 'implementation', 'merge-approval']
+  const order = ['intake', 'plan-approval', 'implementation', 'merge-approval', 'promotion-approval']
 
   if (status === 'complete') {
     return Object.fromEntries(order.map((gate) => [gate, 'complete'])) as Record<string, 'complete' | 'active' | 'blocked'>

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateWebhookSignature } from '@/lib/webhook-validator'
 import { inngest } from '@/inngest/client'
-import { appendLog, createTask, getTaskByIssueNumber } from '@/lib/db'
+import { appendLog, createTask, getTaskByIssueNumber, setTaskGate } from '@/lib/db'
 import { createIssueComment } from '@/lib/github'
 import { formatGateQuestionComment } from '@/inngest/gate-processor'
+import { ensurePromotionTask } from '@/lib/promotion-task'
 
 const WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET
 const WEBHOOK_FORWARD_URL = process.env.WEBHOOK_FORWARD_URL
@@ -212,6 +213,8 @@ export async function POST(request: NextRequest) {
       const labelNames = Array.isArray(pull_request.labels) ? pull_request.labels.map((label: { name?: string }) => label.name).filter(Boolean) : []
       const hasOrchestrationLabel = payload.label?.name === ORCHESTRATION_LABEL || labelNames.includes(ORCHESTRATION_LABEL)
       const shouldTriggerOrchestration = hasOrchestrationLabel && ['labeled', 'opened', 'reopened', 'synchronize', 'ready_for_review'].includes(prAction)
+      const isPromotionPr = pull_request.base?.ref === 'master' && pull_request.head?.ref === 'chet-dev'
+      const shouldTriggerPromotion = isPromotionPr && ['opened', 'reopened', 'synchronize', 'ready_for_review'].includes(prAction)
 
       if (shouldTriggerOrchestration) {
         await inngest.send({
@@ -235,6 +238,30 @@ export async function POST(request: NextRequest) {
           repoOwner,
           repoName,
           installationId,
+        })
+      }
+
+      if (shouldTriggerPromotion) {
+        const promotionTask = await ensurePromotionTask({
+          prNumber: pull_request.number,
+          title: pull_request.title,
+          baseBranch: pull_request.base.ref,
+          headBranch: pull_request.head.ref,
+          htmlUrl: pull_request.html_url,
+        })
+
+        await setTaskGate(promotionTask.task.id, 'promotion-approval')
+        await inngest.send({
+          name: 'orchestration/gate.awaiting_approval',
+          data: {
+            taskId: promotionTask.task.id,
+            gateName: 'promotion-approval',
+            questionPackId: 'promotion-approval',
+            repoOwner,
+            repoName,
+            prNumber: pull_request.number,
+            installationId,
+          },
         })
       }
     }
