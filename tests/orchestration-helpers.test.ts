@@ -24,6 +24,7 @@ import {
   serializePlanPackageLog,
   serializePromotionPackageLog,
 } from '../src/lib/plan-package'
+import { buildTaskPrContextPayload, filterSupersededLogs, stripStructuredPackageLogs } from '../src/lib/task-pr-context'
 
 function createTask(overrides: Partial<AgentTask> = {}): AgentTask {
   return {
@@ -163,4 +164,86 @@ test('plan-approval traceability validation rejects mismatched issue and branch 
   assert.equal(valid.status, 'valid')
   assert.equal(mismatch.status, 'mismatch')
   assert.match(mismatch.message, /issue #364/)
+})
+
+test('task PR context payload uses implementation shape for issue-scoped tasks', () => {
+  const task = createTask()
+  const planPackage = buildPlanPackage({
+    task,
+    answers: {
+      'scope-clear': 'yes',
+      'risk-assessed': 'yes',
+    },
+  })
+  const implementationEvidence = buildImplementationEvidence({
+    taskId: task.id,
+    branch: task.branch,
+    prUrl: 'https://github.com/tdot33/robocogs/pull/431',
+    headSha: 'abc123def456',
+    validationSummary: 'npm run test:traceability passed',
+    scopeSummary: 'Only PR context automation paths changed.',
+    rollbackNotes: 'Revert the PR helper changes if rollout fails.',
+  })
+  const auditorReviewPackage = buildAuditorReviewPackage({ task, implementationEvidence })
+
+  const payload = buildTaskPrContextPayload({
+    task,
+    planPackage,
+    implementationPackage: null,
+    implementationEvidence,
+    auditorReviewPackage,
+    promotionPackage: null,
+  })
+
+  assert.equal(payload.kind, 'implementation')
+  assert.equal(payload.taskId, task.id)
+  assert.equal(payload.planPackage?.taskId, task.id)
+  assert.equal(payload.implementationEvidence?.validationSummary, 'npm run test:traceability passed')
+})
+
+test('task PR context payload uses promotion shape for promotion tasks', () => {
+  const task = createTask({
+    id: 'promotion-430',
+    task_name: 'Promote chet-dev to master',
+    branch: 'promotion:chet-dev->master#430',
+    issue_number: null,
+    gate_current: 'promotion-approval',
+  })
+  const promotionPackage = buildPromotionPackage({
+    task,
+    prNumber: 430,
+    headBranch: 'chet-dev',
+    baseBranch: 'master',
+    htmlUrl: 'https://github.com/tdot33/robocogs/pull/430',
+  })
+
+  const payload = buildTaskPrContextPayload({
+    task,
+    planPackage: null,
+    implementationPackage: null,
+    implementationEvidence: null,
+    auditorReviewPackage: null,
+    promotionPackage,
+  })
+
+  assert.equal(payload.kind, 'promotion')
+  assert.equal(payload.promotionPackage?.summary.includes('Founder approval is required'), true)
+})
+
+test('structured task context helpers filter superseded intake errors and package logs', () => {
+  const logs = [
+    { message: 'Failed to post intake gate comment: timeout', created_at: '2026-04-06T10:00:00.000Z' },
+    { message: 'Posted intake gate comment: https://github.com/example/comment/1', created_at: '2026-04-06T10:05:00.000Z' },
+    { message: 'Failed to post intake gate comment: later failure', created_at: '2026-04-06T10:10:00.000Z' },
+    { message: serializePlanPackageLog(buildPlanPackage({ task: createTask(), answers: {} })), created_at: '2026-04-06T10:11:00.000Z' },
+    { message: 'Human readable audit note', created_at: '2026-04-06T10:12:00.000Z' },
+  ]
+
+  const filtered = filterSupersededLogs(logs)
+  assert.equal(filtered.some((log) => log.message.includes('timeout')), false)
+  assert.equal(filtered.some((log) => log.message.includes('later failure')), true)
+
+  const stripped = stripStructuredPackageLogs(logs)
+  assert.equal(stripped.some((log) => log.message.startsWith('[plan-package]')), false)
+  assert.equal(stripped.some((log) => log.message === 'Human readable audit note'), true)
 })
