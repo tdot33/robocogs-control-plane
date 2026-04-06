@@ -292,6 +292,56 @@ export async function loadTaskPrContextByTaskId(taskId: string): Promise<TaskPrC
   })
 }
 
+export async function findTaskForPrContext(
+  input: {
+    taskId?: string
+    issueNumber?: number
+    branchName?: string
+    prNumber?: number
+    headBranch?: string
+    baseBranch?: string
+  },
+  deps: {
+    getTaskById: typeof getTaskById
+    getTaskByIssueNumber: typeof getTaskByIssueNumber
+    getTaskByBranch: typeof getTaskByBranch
+  } = {
+    getTaskById,
+    getTaskByIssueNumber,
+    getTaskByBranch,
+  }
+): Promise<AgentTask | null> {
+  if (input.taskId) {
+    const task = await deps.getTaskById(input.taskId)
+    if (task) {
+      return task
+    }
+  }
+
+  if (input.prNumber && input.headBranch && input.baseBranch) {
+    const promotionTask = await deps.getTaskByBranch(`promotion:${input.headBranch}->${input.baseBranch}#${input.prNumber}`)
+    if (promotionTask) {
+      return promotionTask
+    }
+  }
+
+  if (input.issueNumber) {
+    const task = await deps.getTaskByIssueNumber(input.issueNumber)
+    if (task) {
+      return task
+    }
+  }
+
+  if (input.branchName) {
+    const task = await deps.getTaskByBranch(input.branchName)
+    if (task) {
+      return task
+    }
+  }
+
+  return null
+}
+
 export async function loadTaskPrContext(input: {
   taskId?: string
   issueNumber?: number
@@ -300,23 +350,7 @@ export async function loadTaskPrContext(input: {
   headBranch?: string
   baseBranch?: string
 }): Promise<TaskPrContextPayload | null> {
-  let task: AgentTask | null = null
-
-  if (input.taskId) {
-    task = await getTaskById(input.taskId)
-  }
-
-  if (!task && input.issueNumber) {
-    task = await getTaskByIssueNumber(input.issueNumber)
-  }
-
-  if (!task && input.branchName) {
-    task = await getTaskByBranch(input.branchName)
-  }
-
-  if (!task && input.prNumber && input.headBranch && input.baseBranch) {
-    task = await getTaskByBranch(`promotion:${input.headBranch}->${input.baseBranch}#${input.prNumber}`)
-  }
+  const task = await findTaskForPrContext(input)
 
   if (!task) {
     return null

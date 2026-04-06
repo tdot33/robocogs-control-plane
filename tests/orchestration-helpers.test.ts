@@ -24,7 +24,7 @@ import {
   serializePlanPackageLog,
   serializePromotionPackageLog,
 } from '../src/lib/plan-package'
-import { buildTaskPrContextPayload, filterSupersededLogs, stripStructuredPackageLogs } from '../src/lib/task-pr-context'
+import { buildTaskPrContextPayload, filterSupersededLogs, findTaskForPrContext, stripStructuredPackageLogs } from '../src/lib/task-pr-context'
 
 function createTask(overrides: Partial<AgentTask> = {}): AgentTask {
   return {
@@ -246,4 +246,52 @@ test('structured task context helpers filter superseded intake errors and packag
   const stripped = stripStructuredPackageLogs(logs)
   assert.equal(stripped.some((log) => log.message.startsWith('[plan-package]')), false)
   assert.equal(stripped.some((log) => log.message === 'Human readable audit note'), true)
+})
+
+test('task lookup prioritizes promotion locator before issue or branch matches', async () => {
+  const promotionTask = createTask({
+    id: 'promotion-430',
+    task_name: 'Promote chet-dev to master',
+    branch: 'promotion:chet-dev->master#430',
+    issue_number: 430,
+    gate_current: 'promotion-approval',
+  })
+  const implementationTask = createTask({
+    id: 'issue-430',
+    task_name: 'Implementation task that shares the issue number',
+    branch: 'feature/430-implementation-work',
+    issue_number: 430,
+  })
+
+  const resolved = await findTaskForPrContext(
+    {
+      issueNumber: 430,
+      branchName: 'feature/430-implementation-work',
+      prNumber: 430,
+      headBranch: 'chet-dev',
+      baseBranch: 'master',
+    },
+    {
+      async getTaskById() {
+        return null
+      },
+      async getTaskByIssueNumber() {
+        return implementationTask
+      },
+      async getTaskByBranch(branchName) {
+        if (branchName === 'promotion:chet-dev->master#430') {
+          return promotionTask
+        }
+
+        if (branchName === 'feature/430-implementation-work') {
+          return implementationTask
+        }
+
+        return null
+      },
+    },
+  )
+
+  assert.equal(resolved?.id, promotionTask.id)
+  assert.equal(resolved?.branch, 'promotion:chet-dev->master#430')
 })
