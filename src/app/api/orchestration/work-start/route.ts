@@ -21,9 +21,14 @@ interface WorkStartPayload {
   issueNumber?: number
   branchName?: string
   scopeSlice?: string
+  implementationReady?: boolean
+  checkoutKind?: string
+  worktreePath?: string
   repoOwner?: string
   repoName?: string
 }
+
+const KNOWN_CHECKOUT_KINDS = new Set(['primary-checkout', 'dedicated-worktree'])
 
 function hasValidSharedSecret(secretHeader: string | null): boolean {
   const configured = process.env.ORCHESTRATION_SHARED_SECRET?.trim()
@@ -63,6 +68,9 @@ export async function POST(request: NextRequest) {
   const repoName = String(body.repoName || '').trim()
   const workKey = String(body.workKey || '').trim()
   const scopeSlice = String(body.scopeSlice || '').trim().toLowerCase()
+  const checkoutKind = String(body.checkoutKind || '').trim()
+  const worktreePath = String(body.worktreePath || '').trim()
+  const implementationReady = body.implementationReady === true
   const issueNumber = Number(body.issueNumber || 0)
   const taskType = String(body.type || '').trim() || 'feature'
 
@@ -72,6 +80,10 @@ export async function POST(request: NextRequest) {
 
   if (scopeSlice && !KNOWN_SCOPE_SLICES.has(scopeSlice)) {
     return NextResponse.json({ error: `Unsupported scope slice: ${scopeSlice}` }, { status: 400 })
+  }
+
+  if (checkoutKind && !KNOWN_CHECKOUT_KINDS.has(checkoutKind)) {
+    return NextResponse.json({ error: `Unsupported checkout kind: ${checkoutKind}` }, { status: 400 })
   }
 
   const taskId = buildTaskId({ workKey, issueNumber })
@@ -111,7 +123,9 @@ export async function POST(request: NextRequest) {
   }
 
   const scopeSuffix = scopeSlice ? `, scope ${scopeSlice}` : ''
-  await appendLog(createResult.task.id, 'work-start-intake', `Created orchestration task from work:start (${taskType}${scopeSuffix})`)
+  const readinessSuffix = checkoutKind ? `, checkout ${checkoutKind}, implementation-ready=${implementationReady}` : ''
+  const worktreeSuffix = worktreePath ? `, worktree ${worktreePath}` : ''
+  await appendLog(createResult.task.id, 'work-start-intake', `Created orchestration task from work:start (${taskType}${scopeSuffix}${readinessSuffix}${worktreeSuffix})`)
 
   if (issueNumber > 0) {
     try {
