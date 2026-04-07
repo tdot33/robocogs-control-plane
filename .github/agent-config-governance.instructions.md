@@ -48,11 +48,11 @@ Apply these rules whenever defining or updating shared or repository-level agent
 - Preserve repository-owned lifecycle paths when they encode traceability or side effects. If a repository provides helpers like `work:start`, `work:pr`, `work:promote`, or a GitHub App orchestration flow, treat those as canonical over equivalent GitHub MCP mutations.
 - Keep GitHub MCP workflow policy in governance and workflow instruction surfaces, not in knowledge-base or support-content sources unless a separate knowledge-policy change is explicitly approved.
 - Avoid destructive git recommendations unless explicitly approved.
-- Prefer a separate git worktree for concurrent issue-scoped sessions or when unrelated local changes must remain untouched.
+- Treat the primary checkout as bootstrap-only for short-lived work branches. After `work:start` resolves or creates a `feature/`, `fix/`, `hotfix/`, `docs/`, or `chore/` branch, attach it to a dedicated git worktree before editing.
 - Treat git worktrees as workspace isolation only; if scope ownership or shared contracts overlap, escalate instead of parallelizing blindly.
 - Before editing files for any issue-scoped task, verify that the active repository, branch, and worktree match the intended task checkout.
 - If the active branch or worktree is unrelated to the task, stop and switch to the intended isolated checkout instead of editing in place.
-- Do not reuse an unrelated branch or non-isolated checkout unless the user explicitly instructs that reuse.
+- Do not continue short-lived branch implementation from the primary checkout, and do not reuse an unrelated branch or non-isolated checkout unless the user explicitly instructs that reuse.
 - In multi-repo or shifting-context sessions, re-verify the active repository, branch, and worktree immediately before each edit batch.
 
 ## Scope Control
