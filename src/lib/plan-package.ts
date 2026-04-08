@@ -103,6 +103,7 @@ export function buildPlanPackage(input: {
       trackedBranchPolicy,
       'Do not retarget work onto master during implementation. Keep execution on the tracked work branch.',
       'Use the repository workflow helpers when needed: work:start establishes the branch, and work:pr opens or updates the review path.',
+      'If the task changes canonical product truth or support-facing workflow semantics in robocogs, update the narrowest matching curated KB doc in that repo and use robocogs/docs/KB_SOURCE_OF_TRUTH.md to choose it.',
     ],
     implementationSteps: [
       'Inspect the target workflow and identify the root change required for the requested behavior.',
@@ -157,6 +158,7 @@ export function buildImplementationPackage(input: {
     implementationChecklist: [
       'Execute only the approved scope from the plan package and avoid unrelated cleanup.',
       'Keep diffs surgical and aligned with existing repository patterns.',
+      'Keep matching robocogs KB docs aligned when shipped behavior, workflow semantics, troubleshooting guidance, or environment expectations change.',
       'Record validation evidence and any scope escalations in orchestration logs before requesting the next gate.',
     ],
     validationSteps: [

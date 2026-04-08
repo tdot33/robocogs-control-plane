@@ -85,6 +85,7 @@ Before writing any code:
 9. Prefer `npm run worktree:add -- --branch=<name>` when creating a new control-plane worktree; if the worktree already exists, run `npm run worktree:bootstrap` there before implementation so dependencies and local env expectations are checked against the active lockfile.
 10. After any change to API routes, Inngest functions, or database helpers, run `npm run build` to confirm no TypeScript errors.
 11. Do not modify `db/migrations/001_initial.sql`. Add a new numbered migration file for schema changes.
+12. When a cross-repo task changes canonical product truth or support-facing workflow semantics in `robocogs`, keep the matching curated KB docs aligned in that repo and point implementers to `robocogs/docs/KB_SOURCE_OF_TRUTH.md` rather than leaving KB drift to CI discovery.
 
 ## GitHub MCP usage
 
