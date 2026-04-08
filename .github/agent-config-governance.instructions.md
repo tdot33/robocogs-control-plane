@@ -29,6 +29,10 @@ Apply these rules whenever defining or updating shared or repository-level agent
 ## Output Contracts
 
 - Prefer the minimum output structure needed for repeatable results.
+- Default to the shortest response that fully completes the task.
+- Prefer prose over headings and bullets unless structure materially improves clarity, reviewability, or execution.
+- Avoid repeating the user's request, unchanged constraints, prior summaries, or workflow guidance already established in context.
+- Keep progress updates to meaningful deltas or milestones rather than cadence-based narration.
 - Include a quality bar with completion criteria.
 - Require explicit assumptions and open questions only when they materially affect the result.
 - Do not restate platform or runtime completion hooks, generic final-summary rules, or baseline progress-update cadence in repository files; local output contracts should add only repository-specific structure.

@@ -75,23 +75,19 @@ Tasks move through gates in order: `intake → plan-approval → implementation 
 
 Before writing any code:
 1. Confirm the task is within the approved gate scope.
-2. For any issue-scoped task, verify that the active repository, branch, and worktree match the intended task checkout before editing files.
-3. If the active branch or worktree is unrelated to the task, stop and move implementation into the intended isolated checkout instead of editing in place.
-4. Do not reuse an unrelated branch or non-isolated checkout unless the user explicitly instructs reuse of the current checkout.
-5. In multi-repo or shifting-context sessions, re-verify the active repository, branch, and worktree immediately before each edit batch.
-6. Make the **smallest possible diff** — prefer targeted edits over rewrites.
-7. For concurrent local work, bootstrap the branch from the clean base checkout and move implementation into a dedicated git worktree rather than reusing a checkout with unrelated changes.
-8. Treat git worktrees as local isolation only; if the requested change overlaps a shared contract, gate, or migration path, escalate instead of assuming parallel work is safe.
-9. Prefer `npm run worktree:add -- --branch=<name>` when creating a new control-plane worktree; if the worktree already exists, run `npm run worktree:bootstrap` there before implementation so dependencies and local env expectations are checked against the active lockfile.
-10. After any change to API routes, Inngest functions, or database helpers, run `npm run build` to confirm no TypeScript errors.
-11. Do not modify `db/migrations/001_initial.sql`. Add a new numbered migration file for schema changes.
-12. When a cross-repo task changes canonical product truth or support-facing workflow semantics in `robocogs`, keep the matching curated KB docs aligned in that repo and point implementers to `robocogs/docs/KB_SOURCE_OF_TRUTH.md` rather than leaving KB drift to CI discovery.
+2. For any issue-scoped task, verify the intended repository, branch, and worktree before editing; if the current checkout is unrelated, switch to the correct isolated checkout instead of editing in place.
+3. Re-verify repository, branch, and worktree immediately before each edit batch in multi-repo or shifting-context sessions.
+4. Make the **smallest possible diff** and use a dedicated worktree for concurrent local work. Prefer `npm run worktree:add -- --branch=<name>` and run `npm run worktree:bootstrap` there before implementation when needed.
+5. Treat git worktrees as local isolation only; if the requested change overlaps a shared contract, gate, or migration path, escalate instead of assuming parallel work is safe.
+6. After any change to API routes, Inngest functions, or database helpers, run `npm run build` to confirm no TypeScript errors.
+7. Do not modify `db/migrations/001_initial.sql`. Add a new numbered migration file for schema changes.
+8. When a cross-repo task changes canonical product truth or support-facing workflow semantics in `robocogs`, keep the matching curated KB docs aligned in that repo and point implementers to `robocogs/docs/KB_SOURCE_OF_TRUTH.md`.
 
 ## GitHub MCP usage
 
 - Prefer GitHub MCP for GitHub read operations such as linked issue or PR context, review state, duplicate discovery, and status-check inspection.
 - Low-risk GitHub MCP writes such as routine issue or PR comments are acceptable only when they do not replace the control-plane GitHub App, webhook, or Inngest orchestration path.
-- Keep GitHub App writes, webhook-driven state changes, gate approvals, workflow dispatch, and any orchestration lifecycle mutations on the existing Octokit and Inngest control path.
+- Keep GitHub App writes, webhook-driven state changes, gate approvals, workflow dispatch, and other orchestration lifecycle mutations on the existing Octokit and Inngest control path.
 - Require explicit user confirmation before any high-risk GitHub MCP write such as issue or PR creation outside canonical helpers, labels, closure or reopen actions, workflow triggers, merges, or comments that act as approvals.
 - Keep GH MCP workflow policy in instruction and governance surfaces, not in knowledge-base content or the versioned `docs/ORCHESTRATION_V1_*` cross-repo contracts.
 
