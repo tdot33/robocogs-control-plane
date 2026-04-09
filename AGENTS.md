@@ -1,6 +1,6 @@
 # AGENTS — RoboCOGS Control Plane
 
-This file is the canonical knowledge-base entry point for AI agents (GitHub Copilot, Codex, custom orchestration agents) working in this repository. Read it in full before starting any implementation work.
+Canonical knowledge-base entry point for agents working in this repository.
 
 ---
 
@@ -13,7 +13,7 @@ This file is the canonical knowledge-base entry point for AI agents (GitHub Copi
 - Runs **async event-driven workflows** through **Inngest** functions (gate processor, CI checks, scope conflicts, etc.).
 - Hosts the **Orchestration Control Surface** dashboard at `/admin/orchestration`.
 
-This service is separate from the main `robocogs` application. It handles *process orchestration only* — no application business logic lives here.
+This service is separate from the main `robocogs` application and handles orchestration only.
 
 ---
 
@@ -189,7 +189,7 @@ The `npm run lint` command invokes `next lint`. For new code, TypeScript strict 
 
 - Use GitHub MCP as a read-optimized surface for linked issue/PR context, review state, and status-check inspection when that reduces manual GitHub lookup.
 - Keep orchestration writes on the existing control-plane path: GitHub App API calls, validated webhooks, Inngest events, and repository helper flows remain authoritative for lifecycle state changes.
-- Do not treat this repo knowledge entry point or the versioned `docs/ORCHESTRATION_V1_*` contracts as a place to redefine support-content or knowledge-base policy.
+- Do not use this entry point or the versioned `docs/ORCHESTRATION_V1_*` contracts to redefine support-content or knowledge-base policy.
 
 ---
 
