@@ -77,8 +77,8 @@ Before writing any code:
 1. Confirm the task is within the approved gate scope.
 2. For any issue-scoped task, verify the intended repository, branch, and worktree before editing; if the current checkout is unrelated, switch to the correct isolated checkout instead of editing in place.
 3. Re-verify repository, branch, and worktree immediately before each edit batch in multi-repo or shifting-context sessions.
-4. Make the **smallest possible diff** and use a dedicated worktree for concurrent local work. Prefer `npm run worktree:add -- --branch=<name>` and run `npm run worktree:bootstrap` there before implementation when needed.
-5. Treat git worktrees as local isolation only; if the requested change overlaps a shared contract, gate, or migration path, escalate instead of assuming parallel work is safe.
+4. Make the **smallest possible diff** and use a dedicated session-scoped worktree branch for concurrent local work. Prefer `npm run worktree:add -- --branch=<name>` so the helper creates an isolated session branch and run `npm run worktree:bootstrap` there before implementation when needed.
+5. Do not reuse another session's worktree or branch for the same issue branch unless the user explicitly directs that reuse. Treat git worktrees as local isolation only; if the requested change overlaps a shared contract, gate, or migration path, escalate instead of assuming parallel work is safe.
 6. After any change to API routes, Inngest functions, or database helpers, run `npm run build` to confirm no TypeScript errors.
 7. Do not modify `db/migrations/001_initial.sql`. Add a new numbered migration file for schema changes.
 8. When a cross-repo task changes canonical product truth or support-facing workflow semantics in `robocogs`, keep the matching curated KB docs aligned in that repo and point implementers to `robocogs/docs/KB_SOURCE_OF_TRUTH.md`.
