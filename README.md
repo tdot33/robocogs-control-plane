@@ -102,7 +102,7 @@ To create and bootstrap a control-plane worktree in one step, use:
 npm run worktree:add -- --branch=chore/123-control-plane-task
 ```
 
-That command derives a sibling `../worktrees/...` path from the branch name, attaches the branch there, and immediately runs `npm run worktree:bootstrap` in the new worktree.
+That command derives a sibling `../worktrees/...` path from the issue branch and a session identifier, creates a session-scoped branch so concurrent agent sessions stay isolated, and immediately runs `npm run worktree:bootstrap` in the new worktree. Pass `--session-id=<session-id>` only when you intentionally want to resume the same session branch and path.
 
 ### 5. Run Development Server
 

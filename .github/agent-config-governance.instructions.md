@@ -52,11 +52,13 @@ Apply these rules whenever defining or updating shared or repository-level agent
 - Preserve repository-owned lifecycle paths when they encode traceability or side effects. If a repository provides helpers like `work:start`, `work:pr`, `work:promote`, or a GitHub App orchestration flow, treat those as canonical over equivalent GitHub MCP mutations.
 - Keep GitHub MCP workflow policy in governance and workflow instruction surfaces, not in knowledge-base or support-content sources unless a separate knowledge-policy change is explicitly approved.
 - Avoid destructive git recommendations unless explicitly approved.
-- Treat the primary checkout as bootstrap-only for short-lived work branches. After `work:start` resolves or creates a `feature/`, `fix/`, `hotfix/`, `docs/`, or `chore/` branch, attach it to a dedicated git worktree before editing.
+- Treat the primary checkout as bootstrap-only for short-lived work branches. After `work:start` resolves or creates a `feature/`, `fix/`, `hotfix/`, `docs/`, or `chore/` branch, move implementation into a dedicated session-scoped git worktree branch before editing.
+- Each agent session must use its own isolated worktree branch derived from the issue branch; never reuse another session's worktree or branch, even when the issue branch already exists.
+- Prefer `npm run worktree:add -- --branch=<branch>` for a fresh isolated session. When resuming the same session deliberately, pass a stable `--session-id=<session-id>` so the helper can target the same session branch and worktree path.
 - Treat git worktrees as workspace isolation only; if scope ownership or shared contracts overlap, escalate instead of parallelizing blindly.
 - Before editing files for any issue-scoped task, verify that the active repository, branch, and worktree match the intended task checkout.
 - If the active branch or worktree is unrelated to the task, stop and switch to the intended isolated checkout instead of editing in place.
-- Do not continue short-lived branch implementation from the primary checkout, and do not reuse an unrelated branch or non-isolated checkout unless the user explicitly instructs that reuse.
+- Do not continue short-lived branch implementation from the primary checkout, and do not reuse an unrelated branch, another session's branch, or a non-isolated checkout unless the user explicitly instructs that reuse.
 - In multi-repo or shifting-context sessions, re-verify the active repository, branch, and worktree immediately before each edit batch.
 
 ## Scope Control
