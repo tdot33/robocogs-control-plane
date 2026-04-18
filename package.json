@@ -9,6 +9,7 @@
     "lint": "next lint",
     "worktree:add": "node scripts/worktree-add.mjs",
     "worktree:bootstrap": "node scripts/worktree-bootstrap.mjs",
+    "worktree:cleanup": "node scripts/worktree-cleanup.mjs",
     "db:migrate": "node scripts/migrate.js",
     "test": "tsx --test tests/**/*.test.ts"
   },
